@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const {
     searchProperty,
+    getWatermarkedFloorPlan,
     getProperties,
     getPropertyById,
     createProperty,
@@ -15,6 +16,11 @@ const { protectEmployee, admin } = require('../middleware/employeeAuthMiddleware
 // @route   POST /api/properties/search
 // @access  Private
 router.post('/search', protect, searchProperty);
+
+// @desc    Get a watermarked floor plan for a property
+// @route   GET /api/properties/:rif/planimetria
+// @access  Private
+router.get('/:rif/planimetria', protect, getWatermarkedFloorPlan);
 
 // === Employee CRUD Routes ===
 router.route('/')

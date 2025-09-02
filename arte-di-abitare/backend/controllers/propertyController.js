@@ -1,92 +1,89 @@
 const Property = require('../models/propertyModel');
+const Lead = require('../models/leadModel');
 const logActivity = require('../utils/logger');
+const sharp = require('sharp');
+const axios = require('axios');
 
-// @desc    Search for a property by RIF (for public users)
-// @route   POST /api/properties/search
-// @access  Private
+// @desc    Search for a property by RIF (for public users) and create a lead
 const searchProperty = async (req, res) => {
     const { rif } = req.body;
-    if (!rif) {
-        res.status(400);
-        return res.json({ message: 'Per favore, fornisci un codice RIF.' });
-    }
+    if (!rif) { return res.status(400).json({ message: 'Per favore, fornisci un codice RIF.' }); }
     try {
-        const processedRif = rif.trim().toUpperCase();
-        const property = await Property.findOne({ rif: processedRif });
+        const property = await Property.findOne({ rif: rif.trim().toUpperCase() });
         if (property && property.isActive) {
-            const propertyDetails = {
-                title: property.title,
-                rif: property.rif,
-                typology: property.typology,
-                zone: property.zone,
-                surface: property.surface,
-                price: property.price,
-                status: property.status,
-                images: property.images.slice(0, 4),
-                floorPlan: property.floorPlan,
-            };
-            res.status(200).json(propertyDetails);
+            await Lead.findOneAndUpdate(
+                { user: req.user._id, property: property._id },
+                { $setOnInsert: { user: req.user._id, property: property._id } },
+                { upsert: true, new: true, runValidators: true }
+            );
+            res.status(200).json({
+                title: property.title, rif: property.rif, typology: property.typology, zone: property.zone,
+                surface: property.surface, price: property.price, status: property.status,
+                images: property.images.slice(0, 4), floorPlan: property.floorPlan,
+            });
         } else {
             res.status(404).json({ message: 'Immobile non trovato o non attivo.' });
         }
     } catch (error) {
-        console.error('Property search error:', error);
         res.status(500).json({ message: 'Errore del server.', error: error.message });
     }
 };
 
-// --- Employee-only routes ---
+// @desc    Get a watermarked floor plan for a property
+const getWatermarkedFloorPlan = async (req, res) => {
+    try {
+        const property = await Property.findOne({ rif: req.params.rif.toUpperCase() });
+        if (!property || !property.floorPlan) {
+            return res.status(404).json({ message: 'Planimetria non trovata.' });
+        }
+        const imageResponse = await axios({ url: property.floorPlan, responseType: 'arraybuffer' });
+        const imageBuffer = Buffer.from(imageResponse.data, 'binary');
+        const userEmail = req.user.email;
+        const currentDate = new Date().toLocaleString('it-IT', { timeZone: 'Europe/Rome' });
+        const watermarkText = `${userEmail}   ${currentDate}`;
+        const svgWatermark = `<svg width="500" height="100"><text x="10" y="50" font-family="Arial" font-size="16" fill="rgba(0, 0, 0, 0.3)" transform="rotate(-15)">${watermarkText}</text></svg>`;
+        const svgBuffer = Buffer.from(svgWatermark);
+        const watermarkedImageBuffer = await sharp(imageBuffer)
+            .composite([{ input: svgBuffer, tile: true, blend: 'over' }])
+            .png() // Convert to png for consistency
+            .toBuffer();
+        res.set('Content-Type', 'image/png');
+        res.send(watermarkedImageBuffer);
+    } catch (error) {
+        console.error('Watermark service error:', error);
+        res.status(500).json({ message: 'Errore durante la creazione del watermark.' });
+    }
+};
 
-// @desc    Get all properties for admin list
-// @route   GET /api/properties
-// @access  Private/Employee
+// --- Employee-only routes ---
 const getProperties = async (req, res) => {
     try {
         const properties = await Property.find({}).sort({ createdAt: -1 });
         res.json(properties);
-    } catch (error) {
-        res.status(500).json({ message: 'Errore del server.' });
-    }
+    } catch (error) { res.status(500).json({ message: 'Errore del server.' }); }
 };
 
-// @desc    Get a single property by ID
-// @route   GET /api/properties/:id
-// @access  Private/Employee
 const getPropertyById = async (req, res) => {
     try {
         const property = await Property.findById(req.params.id);
-        if (property) {
-            res.json(property);
-        } else {
-            res.status(404).json({ message: 'Immobile non trovato.' });
-        }
-    } catch (error) {
-        res.status(500).json({ message: 'Errore del server.' });
-    }
+        if (property) { res.json(property); }
+        else { res.status(404).json({ message: 'Immobile non trovato.' }); }
+    } catch (error) { res.status(500).json({ message: 'Errore del server.' }); }
 };
 
-// @desc    Create a property
-// @route   POST /api/properties
-// @access  Private/Employee
 const createProperty = async (req, res) => {
     try {
         const { rif } = req.body;
+        if (!rif) return res.status(400).json({ message: 'Il RIF è obbligatorio.' });
         const propertyExists = await Property.findOne({ rif: rif.trim().toUpperCase() });
-        if (propertyExists) {
-            return res.status(400).json({ message: 'Un immobile con questo RIF esiste già.' });
-        }
+        if (propertyExists) { return res.status(400).json({ message: 'Un immobile con questo RIF esiste già.' }); }
         const property = new Property({ ...req.body });
         const createdProperty = await property.save();
         logActivity(req.employee._id, 'CREATE_PROPERTY', `Creato immobile RIF: ${createdProperty.rif}`);
         res.status(201).json(createdProperty);
-    } catch (error) {
-        res.status(400).json({ message: 'Dati immobile non validi.', error: error.message });
-    }
+    } catch (error) { res.status(400).json({ message: 'Dati immobile non validi.', error: error.message }); }
 };
 
-// @desc    Update a property
-// @route   PUT /api/properties/:id
-// @access  Private/Employee
 const updateProperty = async (req, res) => {
     try {
         const property = await Property.findById(req.params.id);
@@ -98,14 +95,9 @@ const updateProperty = async (req, res) => {
         } else {
             res.status(404).json({ message: 'Immobile non trovato.' });
         }
-    } catch (error) {
-        res.status(400).json({ message: 'Dati immobile non validi.', error: error.message });
-    }
+    } catch (error) { res.status(400).json({ message: 'Dati immobile non validi.', error: error.message }); }
 };
 
-// @desc    Delete a property
-// @route   DELETE /api/properties/:id
-// @access  Private/Admin
 const deleteProperty = async (req, res) => {
     try {
         const property = await Property.findById(req.params.id);
@@ -117,16 +109,10 @@ const deleteProperty = async (req, res) => {
         } else {
             res.status(404).json({ message: 'Immobile non trovato.' });
         }
-    } catch (error) {
-        res.status(500).json({ message: 'Errore del server.' });
-    }
+    } catch (error) { res.status(500).json({ message: 'Errore del server.' }); }
 };
 
 module.exports = {
-    searchProperty,
-    getProperties,
-    getPropertyById,
-    createProperty,
-    updateProperty,
-    deleteProperty,
+    searchProperty, getWatermarkedFloorPlan, getProperties, getPropertyById,
+    createProperty, updateProperty, deleteProperty,
 };

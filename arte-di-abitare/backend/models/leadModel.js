@@ -14,11 +14,11 @@ const leadSchema = mongoose.Schema(
     },
     // Answers from the first questionnaire
     qualificationAnswers: {
-      maxBudget: { type: String, required: true },
-      purchaseTimeline: { type: String, required: true },
-      mortgagePreApproval: { type: String, required: true },
-      isFirstHome: { type: String, required: true },
-      availabilityForVisit: { type: String, required: true },
+      maxBudget: { type: String },
+      purchaseTimeline: { type: String },
+      mortgagePreApproval: { type: String },
+      isFirstHome: { type: String },
+      availabilityForVisit: { type: String },
     },
     // Answers from the second questionnaire (to be used later)
     postViewingAnswers: {
