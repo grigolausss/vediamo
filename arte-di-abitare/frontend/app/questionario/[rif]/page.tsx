@@ -1,138 +1,137 @@
 "use client";
 
 import { useState } from 'react';
-import { useParams, useRouter } from 'next/navigation'; // Import useRouter
+import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 
-// Define the structure of the answers
+// New state structure for the questionnaire answers
 interface Answers {
+  sellToBuy: 'sì' | 'no' | '';
   maxBudget: string;
-  purchaseTimeline: string;
-  mortgagePreApproval: string;
-  isFirstHome: string;
-  availabilityForVisit: string;
+  needsMortgage: 'sì' | 'no' | '';
+  mortgagePercentage: number | '';
+  mortgagePreApproval: 'sì' | 'no, ma ho già parlato con la mia banca...' | 'no, desidero una consulenza gratuita' | '';
+  purchaseTimeline: 'entro 3 mesi' | 'entro 6 mesi' | 'entro 1 anno' | 'non ho fretta' | '';
 }
 
-export default function QuestionnairePage() {
-  const params = useParams();
-  const router = useRouter(); // Initialize router for navigation
-  const rif = params.rif as string;
+// Reusable button for selecting options
+const ChoiceButton = ({ text, onClick, isSelected }: { text: string; onClick: () => void; isSelected: boolean; }) => (
+    <button type="button" onClick={onClick} className={`px-4 py-2 rounded-lg border-2 w-full text-center transition-colors ${isSelected ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-blue-600 border-blue-500 hover:bg-blue-100'}`}>
+        {text}
+    </button>
+);
 
-  const [answers, setAnswers] = useState<Answers>({
-    maxBudget: '',
-    purchaseTimeline: '',
-    mortgagePreApproval: '',
-    isFirstHome: '',
-    availabilityForVisit: '',
-  });
+export default function NewQuestionnairePage() {
+    const params = useParams();
+    const router = useRouter();
+    const rif = params.rif as string;
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+    const [answers, setAnswers] = useState<Answers>({
+        sellToBuy: '',
+        maxBudget: '',
+        needsMortgage: '',
+        mortgagePercentage: '',
+        mortgagePreApproval: '',
+        purchaseTimeline: '',
+    });
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setAnswers((prev) => ({ ...prev, [name]: value }));
-  };
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-  const isFormComplete = Object.values(answers).every(answer => answer !== '');
+    const handleAnswerChange = <K extends keyof Answers>(key: K, value: Answers[K]) => {
+        setAnswers(prev => ({ ...prev, [key]: value }));
+    };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setError(null);
+    const isFormComplete = () => {
+        if (!answers.sellToBuy || !answers.maxBudget || !answers.needsMortgage || !answers.mortgagePreApproval || !answers.purchaseTimeline) return false;
+        if (answers.needsMortgage === 'sì' && answers.mortgagePercentage === '') return false;
+        return true;
+    };
 
-    try {
-        const token = localStorage.getItem('authToken');
-        if (!token) {
-            throw new Error('Autenticazione richiesta. Per favore, effettua di nuovo la verifica via email.');
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!isFormComplete()) {
+            setError("Per favore, rispondi a tutte le domande.");
+            return;
         }
+        setIsSubmitting(true);
+        setError(null);
 
-        const response = await fetch('/api/leads/questionnaire1', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`,
-            },
-            body: JSON.stringify({ propertyRif: rif, answers }),
-        });
+        try {
+            const token = localStorage.getItem('authToken');
+            if (!token) throw new Error('Autenticazione richiesta.');
 
-        const data = await response.json();
+            // This will be a new endpoint
+            const response = await fetch('/api/leads/questionnaire1', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ propertyRif: rif, answers }),
+            });
 
-        if (!response.ok) {
-            throw new Error(data.message || 'Si è verificato un errore durante l\'invio.');
-        }
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.message || 'Si è verificato un errore.');
+            }
 
-        setSuccess(true);
-        // Redirect to the floor plan page after a short delay
-        setTimeout(() => {
-            // Redirect to the floor plan page, as per the user flow.
             router.push(`/planimetria/${rif}`);
-        }, 2000);
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
 
-    } catch (err: any) {
-        setError(err.message);
-    } finally {
-        setIsSubmitting(false);
-    }
-  };
-
-  const questions = [
-    { name: 'maxBudget', question: 'Budget massimo:', options: ['<150.000', '150.000–250.000', '250.000–350.000', '>350.000'] },
-    { name: 'purchaseTimeline', question: 'Quando prevedi di acquistare:', options: ['entro 3 mesi', 'entro 6 mesi', 'entro 1 anno', 'non ho fretta'] },
-    { name: 'mortgagePreApproval', question: 'Hai una pre-approvazione del mutuo?', options: ['Sì', 'No, ma ho già parlato con la banca', 'No, devo ancora iniziare', 'Comprerò in contanti'] },
-    { name: 'isFirstHome', question: 'È la tua prima casa?', options: ['Sì', 'No'] },
-    { name: 'availabilityForVisit', question: 'Disponibile per visite nei prossimi 7 giorni?', options: ['Sì', 'No'] }
-  ];
-
-  if (success) {
     return (
-        <div className="min-h-screen bg-blue-50 flex items-center justify-center p-4">
-            <div className="max-w-2xl w-full bg-white rounded-xl shadow-xl p-8 text-center">
-                <h1 className="text-3xl font-bold text-green-600 mb-4">Grazie!</h1>
-                <p className="text-lg text-gray-700">Il tuo questionario è stato inviato con successo. Verrai reindirizzato a breve.</p>
+        <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+            <div className="max-w-3xl w-full bg-white rounded-2xl shadow-xl p-8 space-y-8">
+                <h1 className="text-3xl font-bold text-gray-800 text-center">Per favore, rispondi a queste domande per aiutarci a capire meglio le tue esigenze.</h1>
+
+                <form onSubmit={handleSubmit} className="space-y-10">
+                    {/* Q1 */}
+                    <fieldset><legend className="text-lg font-semibold mb-3">Per l’acquisto della tua nuova casa, devi vendere la tua casa attuale o un immobile?</legend>
+                        <div className="grid grid-cols-2 gap-4">
+                            <ChoiceButton text="Sì" onClick={() => handleAnswerChange('sellToBuy', 'sì')} isSelected={answers.sellToBuy === 'sì'} />
+                            <ChoiceButton text="No" onClick={() => handleAnswerChange('sellToBuy', 'no')} isSelected={answers.sellToBuy === 'no'} />
+                        </div>
+                    </fieldset>
+                    {/* Q2 */}
+                    <fieldset><legend className="text-lg font-semibold mb-3">Qual è il tuo budget massimo?</legend>
+                        <input type="text" value={answers.maxBudget} onChange={(e) => handleAnswerChange('maxBudget', e.target.value)} className="w-full p-2 border rounded-md" placeholder="Es. 300.000€"/>
+                    </fieldset>
+                    {/* Q3 */}
+                    <fieldset><legend className="text-lg font-semibold mb-3">Devi fare un mutuo per l’acquisto?</legend>
+                        <div className="grid grid-cols-2 gap-4">
+                            <ChoiceButton text="Sì" onClick={() => handleAnswerChange('needsMortgage', 'sì')} isSelected={answers.needsMortgage === 'sì'} />
+                            <ChoiceButton text="No" onClick={() => handleAnswerChange('needsMortgage', 'no')} isSelected={answers.needsMortgage === 'no'} />
+                        </div>
+                        {answers.needsMortgage === 'sì' && (
+                            <div className="mt-4"><label className="block font-semibold mb-2">Percentuale necessaria:</label><input type="number" min="0" max="100" value={answers.mortgagePercentage} onChange={(e) => handleAnswerChange('mortgagePercentage', e.target.value === '' ? '' : parseInt(e.target.value))} className="w-full p-2 border rounded-md" placeholder="Es. 80%"/></div>
+                        )}
+                    </fieldset>
+                    {/* Q4 */}
+                    <fieldset><legend className="text-lg font-semibold mb-3">Hai una pre-approvazione del mutuo?</legend>
+                        <div className="space-y-3">
+                            <ChoiceButton text="Sì" onClick={() => handleAnswerChange('mortgagePreApproval', 'sì')} isSelected={answers.mortgagePreApproval === 'sì'} />
+                            <ChoiceButton text="No, ma ho già parlato con la mia banca e sono sicuro di ottenere il mutuo necessario" onClick={() => handleAnswerChange('mortgagePreApproval', 'no, ma ho già parlato con la mia banca...')} isSelected={answers.mortgagePreApproval === 'no, ma ho già parlato con la mia banca...'} />
+                            <ChoiceButton text="No, desidero una consulenza gratuita" onClick={() => handleAnswerChange('mortgagePreApproval', 'no, desidero una consulenza gratuita')} isSelected={answers.mortgagePreApproval === 'no, desidero una consulenza gratuita'} />
+                        </div>
+                    </fieldset>
+                    {/* Q5 */}
+                    <fieldset><legend className="text-lg font-semibold mb-3">Quando prevedi di acquistare?</legend>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <ChoiceButton text="Entro 3 mesi" onClick={() => handleAnswerChange('purchaseTimeline', 'entro 3 mesi')} isSelected={answers.purchaseTimeline === 'entro 3 mesi'} />
+                            <ChoiceButton text="Entro 6 mesi" onClick={() => handleAnswerChange('purchaseTimeline', 'entro 6 mesi')} isSelected={answers.purchaseTimeline === 'entro 6 mesi'} />
+                            <ChoiceButton text="Entro 1 anno" onClick={() => handleAnswerChange('purchaseTimeline', 'entro 1 anno')} isSelected={answers.purchaseTimeline === 'entro 1 anno'} />
+                            <ChoiceButton text="Non ho fretta" onClick={() => handleAnswerChange('purchaseTimeline', 'non ho fretta')} isSelected={answers.purchaseTimeline === 'non ho fretta'} />
+                        </div>
+                    </fieldset>
+
+                    {error && <p className="text-red-600 text-center font-semibold">{error}</p>}
+                    <button type="submit" disabled={isSubmitting || !isFormComplete()} className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-6 rounded-lg shadow-lg transition-transform text-xl disabled:bg-gray-400 disabled:cursor-not-allowed">
+                        {isSubmitting ? 'Invio...' : 'Continua'}
+                    </button>
+                </form>
             </div>
         </div>
     );
-  }
-
-  return (
-    <div className="min-h-screen bg-blue-50 flex items-center justify-center p-4 sm:p-6">
-      <div className="max-w-2xl w-full bg-white rounded-xl shadow-xl p-6 sm:p-8">
-        <h1 className="text-2xl sm:text-3xl font-bold text-blue-900 mb-6 text-center">Questionario di Qualificazione</h1>
-        <p className="text-center text-gray-600 mb-8">Per continuare, per favore rispondi a queste brevi domande.</p>
-        <form onSubmit={handleSubmit} className="space-y-8">
-          {questions.map(({ name, question, options }) => (
-            <fieldset key={name} className="border-t border-gray-200 pt-6">
-              <legend className="text-lg font-semibold text-gray-800 mb-3">{question}</legend>
-              <div className="space-y-2">
-                {options.map(option => (
-                  <label key={option} className="flex items-center p-3 rounded-lg border border-gray-200 hover:bg-blue-50 transition-colors cursor-pointer">
-                    <input
-                      type="radio"
-                      name={name}
-                      value={option}
-                      checked={answers[name as keyof Answers] === option}
-                      onChange={handleInputChange}
-                      className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300"
-                    />
-                    <span className="ml-3 text-md text-gray-700">{option}</span>
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-          ))}
-
-          {error && <p className="text-red-600 text-center">{error}</p>}
-
-          <button
-            type="submit"
-            disabled={!isFormComplete || isSubmitting}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-colors text-lg disabled:bg-gray-400 disabled:cursor-not-allowed"
-          >
-            {isSubmitting ? 'Invio in corso...' : 'Invia Questionario'}
-          </button>
-        </form>
-      </div>
-    </div>
-  );
 }

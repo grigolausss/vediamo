@@ -1,6 +1,7 @@
 const express = require('express');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
+const path = require('path');
 
 dotenv.config();
 
@@ -10,6 +11,10 @@ const app = express();
 
 app.use(express.json());
 
+// Serve static files from the 'public' directory
+app.use('/public', express.static(path.join(__dirname, 'public')));
+
+// API routes
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/properties', require('./routes/propertyRoutes'));
 app.use('/api/leads', require('./routes/leadRoutes'));

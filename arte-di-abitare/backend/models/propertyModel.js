@@ -8,55 +8,49 @@ const propertySchema = mongoose.Schema(
       unique: true,
       trim: true,
       uppercase: true,
-      index: true, // Add index for faster search
+      index: true,
     },
     title: {
       type: String,
       required: true,
     },
-    typology: {
-      type: String,
-      required: true,
-    },
+    // New fields requested by user
     zone: {
       type: String,
-      required: true,
-    },
-    surface: {
-      type: Number, // Metratura in mq
       required: true,
     },
     price: {
       type: Number,
       required: true,
     },
-    status: {
-      type: String, // e.g., 'Disponibile', 'Venduto', 'In trattativa'
+    surface: { // mq
+      type: Number,
       required: true,
     },
-    address: {
+    bedrooms: { // numero camere
+      type: Number,
+      required: true,
+    },
+    bathrooms: { // numero bagni
+      type: Number,
+      required: true,
+    },
+    // Image paths
+    dossierImage: {
       type: String,
       required: true,
     },
-    images: [
-      {
-        type: String,
-      },
-    ],
-    floorPlan: {
+    planimetryImage: {
+      type: String,
+      required: true,
+    },
+    zoneImage: {
       type: String,
       required: true,
     },
     isActive: {
       type: Boolean,
       default: true,
-    },
-    // Optional fields
-    yearOfConstruction: {
-      type: Number,
-    },
-    description: {
-      type: String,
     },
   },
   {

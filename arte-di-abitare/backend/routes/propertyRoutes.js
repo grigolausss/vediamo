@@ -7,29 +7,34 @@ const {
     getPropertyById,
     createProperty,
     updateProperty,
-    deleteProperty
+    deleteProperty,
+    getPropertyZone,
+    getAlternatives // Added new function
 } = require('../controllers/propertyController');
 const { protect } = require('../middleware/authMiddleware');
 const { protectEmployee, admin } = require('../middleware/employeeAuthMiddleware');
+const upload = require('../middleware/uploadMiddleware');
 
-// @desc    Search for a property by RIF (for public users)
-// @route   POST /api/properties/search
-// @access  Private
+// === Public User Routes ===
+
 router.post('/search', protect, searchProperty);
-
-// @desc    Get a watermarked floor plan for a property
-// @route   GET /api/properties/:rif/planimetria
-// @access  Private
 router.get('/:rif/planimetria', protect, getWatermarkedFloorPlan);
+router.get('/:rif/zone', protect, getPropertyZone);
+
+// @desc    Get alternative properties based on user's lead data
+// @route   GET /api/properties/:rif/alternatives
+// @access  Private
+router.get('/:rif/alternatives', protect, getAlternatives);
+
 
 // === Employee CRUD Routes ===
 router.route('/')
     .get(protectEmployee, getProperties)
-    .post(protectEmployee, createProperty);
+    .post(protectEmployee, upload, createProperty);
 
 router.route('/:id')
     .get(protectEmployee, getPropertyById)
-    .put(protectEmployee, updateProperty)
+    .put(protectEmployee, upload, updateProperty)
     .delete(protectEmployee, admin, deleteProperty);
 
 module.exports = router;

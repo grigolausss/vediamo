@@ -4,16 +4,47 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
-// Interfaces
+// Updated interfaces to match the new backend model
+interface Questionnaire1 {
+    sellToBuy: string;
+    maxBudget: string;
+    needsMortgage: string;
+    mortgagePercentage?: number;
+    mortgagePreApproval: string;
+    purchaseTimeline: string;
+}
+
+interface Questionnaire2 {
+    searchZone: string;
+    minBedrooms: number;
+    mustHaveFeatures: string;
+    searchDuration: string;
+}
+
 interface LeadDetails {
   _id: string;
-  user: { name: string; surname: string; email: string; phone: string; };
-  property: { title: string; rif: string; };
+  user: { name: string; surname: string; email: string; phone?: string; };
+  property: { _id: string; title: string; rif: string; };
   status: string;
-  qualificationAnswers: { maxBudget: string; purchaseTimeline: string; mortgagePreApproval: string; isFirstHome: string; availabilityForVisit: string; };
-  postViewingAnswers?: { searchZone: string; minBedrooms: number; mustHaveFeatures: string; urgency: string; finalFeedback: string; };
-  notes: { text: string; employee: { email: string }; date: string; _id: string; }[];
   createdAt: string;
+  questionnaire1?: Questionnaire1;
+  questionnaire2?: Questionnaire2;
+  isContacted: boolean;
+  calledBy?: { email: string; };
+  callDate?: string;
+  needsCallback: boolean;
+  callbackDate?: string;
+  notes: { text: string; employee: { email: string }; date: string; _id: string; }[];
+}
+
+// State for the call manager form
+interface CallManagerData {
+    isContacted: boolean;
+    calledByEmail: string;
+    callDate: string;
+    noteText: string;
+    needsCallback: boolean;
+    callbackDate: string;
 }
 
 export default function LeadDetailPage() {
@@ -24,12 +55,24 @@ export default function LeadDetailPage() {
     const [lead, setLead] = useState<LeadDetails | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-
-    const [newStatus, setNewStatus] = useState('');
-    const [noteText, setNoteText] = useState('');
     const [isUpdating, setIsUpdating] = useState(false);
 
+    const [callManager, setCallManager] = useState<CallManagerData>({
+        isContacted: false,
+        calledByEmail: '',
+        callDate: '',
+        noteText: '',
+        needsCallback: false,
+        callbackDate: '',
+    });
+
+    const [currentUserEmail, setCurrentUserEmail] = useState('');
+
     useEffect(() => {
+        // In a real app, you'd get this from a global state/context
+        const storedEmail = localStorage.getItem('employeeEmail');
+        if(storedEmail) setCurrentUserEmail(storedEmail);
+
         if (!id) return;
         const fetchLead = async () => {
             setLoading(true);
@@ -38,96 +81,148 @@ export default function LeadDetailPage() {
                 if (!token) { router.push('/admin/login'); return; }
                 const res = await fetch(`/api/leads/${id}`, { headers: { 'Authorization': `Bearer ${token}` } });
                 if (!res.ok) throw new Error('Lead non trovato.');
-                const data = await res.json();
+                const data: LeadDetails = await res.json();
                 setLead(data);
-                setNewStatus(data.status);
+                // Initialize form state from fetched lead data
+                setCallManager({
+                    isContacted: data.isContacted || false,
+                    calledByEmail: data.calledBy?.email || (data.isContacted ? '' : storedEmail || ''),
+                    callDate: data.callDate ? new Date(data.callDate).toISOString().slice(0, 16) : '',
+                    noteText: '', // Keep note text fresh
+                    needsCallback: data.needsCallback || false,
+                    callbackDate: data.callbackDate ? new Date(data.callbackDate).toISOString().slice(0, 16) : '',
+                });
             } catch (err: any) { setError(err.message); }
             finally { setLoading(false); }
         };
         fetchLead();
     }, [id, router]);
 
-    const handleStatusUpdate = async (e: React.FormEvent) => {
+    const handleCallManagerChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        const { name, value, type } = e.target;
+        const isCheckbox = type === 'checkbox';
+        const { checked } = e.target as HTMLInputElement;
+
+        setCallManager(prev => {
+            const newState = { ...prev, [name]: isCheckbox ? checked : value };
+            // If "isContacted" is checked, pre-fill "calledByEmail" if it's empty
+            if (name === 'isContacted' && checked && !newState.calledByEmail) {
+                newState.calledByEmail = currentUserEmail;
+            }
+            return newState;
+        });
+    };
+
+    const handleUpdateCallDetails = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsUpdating(true);
+        setError(null);
         try {
             const token = localStorage.getItem('employeeAuthToken');
             if (!token) { router.push('/admin/login'); return; }
-            const res = await fetch(`/api/leads/${id}/status`, {
+            // This will be a new endpoint to handle this specific form
+            const res = await fetch(`/api/leads/${id}/call-details`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ status: newStatus, noteText }),
+                body: JSON.stringify(callManager),
             });
-            if (!res.ok) throw new Error('Errore durante l\'aggiornamento.');
+            if (!res.ok) {
+                const errorData = await res.json();
+                throw new Error(errorData.message || 'Errore durante l\'aggiornamento.');
+            }
             const updatedLead = await res.json();
-            setLead(updatedLead);
-            setNoteText('');
+            setLead(updatedLead); // Refresh lead data
+            // Reset note text after successful submission
+            setCallManager(prev => ({...prev, noteText: ''}));
         } catch (err: any) { setError(err.message); }
         finally { setIsUpdating(false); }
     };
 
-    if (loading) return <p className="text-center">Caricamento lead...</p>;
-    if (error) return <p className="text-center text-red-600">Errore: {error}</p>;
-    if (!lead) return <p className="text-center">Lead non trovato.</p>;
+    if (loading) return <p className="text-center mt-8">Caricamento dettagli lead...</p>;
+    if (error) return <p className="text-center text-red-600 mt-8">Errore: {error}</p>;
+    if (!lead) return <p className="text-center mt-8">Nessun lead trovato.</p>;
+
+    const renderQuestion = (label: string, value: any) => (
+        value !== undefined && value !== null && value !== '' &&
+        <li className="py-2"><span className="font-semibold">{label}:</span> {String(value)}</li>
+    );
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow-lg">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            {/* Left Side (75%) */}
+            <div className="lg:col-span-3 bg-white p-6 rounded-lg shadow-lg">
                 <h1 className="text-3xl font-bold mb-4">{lead.user.name} {lead.user.surname}</h1>
-                <p><strong>Email:</strong> {lead.user.email}</p>
-                <p><strong>Telefono:</strong> {lead.user.phone || 'Non fornito'}</p>
-                <p><strong>Immobile di interesse:</strong> {lead.property.title} (<Link href={`/admin/immobili/${lead.property._id}`} className="text-blue-600 hover:underline">{lead.property.rif}</Link>)</p>
-                <p><strong>Stato attuale:</strong> <span className="font-semibold px-2 py-1 bg-blue-200 text-blue-800 rounded-full text-sm">{lead.status}</span></p>
-
-                <div className="mt-6 border-t pt-4">
-                    <h2 className="text-2xl font-bold mb-2">Questionario 1: Qualificazione</h2>
-                    <ul>
-                        <li><strong>Budget Massimo:</strong> {lead.qualificationAnswers.maxBudget}</li>
-                        <li><strong>Tempistica Acquisto:</strong> {lead.qualificationAnswers.purchaseTimeline}</li>
-                        <li><strong>Pre-approvazione Mutuo:</strong> {lead.qualificationAnswers.mortgagePreApproval}</li>
-                        <li><strong>Prima Casa:</strong> {lead.qualificationAnswers.isFirstHome}</li>
-                        <li><strong>Disponibilità Visite:</strong> {lead.qualificationAnswers.availabilityForVisit}</li>
-                    </ul>
+                <div className="space-y-1 text-gray-700 mb-6">
+                    <p><strong>Email:</strong> {lead.user.email}</p>
+                    <p><strong>Telefono:</strong> {lead.user.phone || 'Non fornito'}</p>
+                    <p><strong>Immobile di interesse:</strong> {lead.property.title} (<Link href={`/admin/immobili/edit/${lead.property._id}`} className="text-blue-600 hover:underline">{lead.property.rif}</Link>)</p>
+                    <p><strong>Stato attuale:</strong> <span className="font-semibold px-2 py-1 bg-blue-200 text-blue-800 rounded-full text-sm">{lead.status}</span></p>
+                    <p><strong>Data Creazione Lead:</strong> {new Date(lead.createdAt).toLocaleString('it-IT')}</p>
                 </div>
-                {lead.postViewingAnswers && (
+
+                {lead.questionnaire1 && (
                     <div className="mt-6 border-t pt-4">
-                        <h2 className="text-2xl font-bold mb-2">Questionario 2: Feedback Post-Visita</h2>
-                        <ul>
-                            <li><strong>Zona di Ricerca:</strong> {lead.postViewingAnswers.searchZone}</li>
-                            <li><strong>Camere Minime:</strong> {lead.postViewingAnswers.minBedrooms}</li>
-                            <li><strong>Caratteristiche Essenziali:</strong> {lead.postViewingAnswers.mustHaveFeatures}</li>
-                            <li><strong>Urgenza:</strong> {lead.postViewingAnswers.urgency}</li>
-                            <li><strong>Feedback Finale:</strong> {lead.postViewingAnswers.finalFeedback}</li>
+                        <h2 className="text-2xl font-bold mb-2">Questionario 1</h2>
+                        <ul className="divide-y divide-gray-200">
+                            {renderQuestion('Deve vendere per acquistare', lead.questionnaire1.sellToBuy)}
+                            {renderQuestion('Budget massimo', lead.questionnaire1.maxBudget)}
+                            {renderQuestion('Necessita mutuo', lead.questionnaire1.needsMortgage)}
+                            {renderQuestion('Percentuale mutuo richiesta', lead.questionnaire1.mortgagePercentage ? `${lead.questionnaire1.mortgagePercentage}%` : undefined)}
+                            {renderQuestion('Pre-approvazione mutuo', lead.questionnaire1.mortgagePreApproval)}
+                            {renderQuestion('Tempistica di acquisto', lead.questionnaire1.purchaseTimeline)}
+                        </ul>
+                    </div>
+                )}
+                {lead.questionnaire2 && (
+                     <div className="mt-6 border-t pt-4">
+                        <h2 className="text-2xl font-bold mb-2">Questionario 2</h2>
+                        <ul className="divide-y divide-gray-200">
+                            {renderQuestion('Zona di ricerca', lead.questionnaire2.searchZone)}
+                            {renderQuestion('Numero minimo di camere', lead.questionnaire2.minBedrooms)}
+                            {renderQuestion('Cosa non può mancare', lead.questionnaire2.mustHaveFeatures)}
+                            {renderQuestion('Da quanto tempo cerca', lead.questionnaire2.searchDuration)}
                         </ul>
                     </div>
                 )}
             </div>
 
+            {/* Right Side (25%) */}
             <div className="lg:col-span-1 bg-white p-6 rounded-lg shadow-lg">
-                <h2 className="text-2xl font-bold mb-4">Aggiorna Stato Lead</h2>
-                <form onSubmit={handleStatusUpdate}>
-                    <label htmlFor="status" className="block font-semibold mb-1">Nuovo Stato</label>
-                    <select id="status" value={newStatus} onChange={(e) => setNewStatus(e.target.value)} className="w-full p-2 border rounded-md mb-4">
-                        <option value="Nuovo">Nuovo</option>
-                        <option value="Contattato">Contattato</option>
-                        <option value="Da richiamare">Da richiamare</option>
-                        <option value="Non interessato">Non interessato</option>
-                    </select>
-                    <label htmlFor="noteText" className="block font-semibold mb-1">Aggiungi Nota</label>
-                    <textarea id="noteText" value={noteText} onChange={(e) => setNoteText(e.target.value)} placeholder="Es. Chiamato, fissato appuntamento per..." className="w-full p-2 border rounded-md mb-4" rows={4}></textarea>
-                    <button type="submit" disabled={isUpdating} className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400">{isUpdating ? 'Salvataggio...' : 'Salva Modifiche'}</button>
+                <form onSubmit={handleUpdateCallDetails} className="space-y-4">
+                    <h2 className="text-2xl font-bold">Gestore Chiamate</h2>
+
+                    <div className="flex items-center gap-2"><input type="checkbox" id="isContacted" name="isContacted" checked={callManager.isContacted} onChange={handleCallManagerChange} className="h-5 w-5" /><label htmlFor="isContacted">Lead già contattato</label></div>
+
+                    {callManager.isContacted && (
+                        <div className="pl-4 border-l-2 space-y-4">
+                            <div><label htmlFor="calledByEmail" className="block font-semibold text-sm">Chiamato da</label><input type="email" id="calledByEmail" name="calledByEmail" value={callManager.calledByEmail} onChange={handleCallManagerChange} className="w-full p-2 border rounded-md mt-1" /></div>
+                            <div><label htmlFor="callDate" className="block font-semibold text-sm">Data chiamata</label><input type="datetime-local" id="callDate" name="callDate" value={callManager.callDate} onChange={handleCallManagerChange} className="w-full p-2 border rounded-md mt-1" /></div>
+                            <div><label htmlFor="noteText" className="block font-semibold text-sm">Note</label><textarea id="noteText" name="noteText" value={callManager.noteText} onChange={handleCallManagerChange} className="w-full p-2 border rounded-md mt-1" rows={4} placeholder="Inserisci qui le note della chiamata..."></textarea></div>
+                        </div>
+                    )}
+
+                    <div className="flex items-center gap-2 pt-2"><input type="checkbox" id="needsCallback" name="needsCallback" checked={callManager.needsCallback} onChange={handleCallManagerChange} className="h-5 w-5" /><label htmlFor="needsCallback">Da richiamare</label></div>
+
+                    {callManager.needsCallback && (
+                        <div className="pl-4 border-l-2">
+                             <div><label htmlFor="callbackDate" className="block font-semibold text-sm">Promemoria richiamo</label><input type="datetime-local" id="callbackDate" name="callbackDate" value={callManager.callbackDate} onChange={handleCallManagerChange} required className="w-full p-2 border rounded-md mt-1" /></div>
+                        </div>
+                    )}
+
+                    <button type="submit" disabled={isUpdating} className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400">{isUpdating ? 'Salvataggio...' : 'Salva'}</button>
+                    {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
                 </form>
 
                 <div className="mt-6 border-t pt-4">
-                    <h2 className="text-2xl font-bold mb-2">Cronologia Note</h2>
-                    <div className="space-y-4 max-h-96 overflow-y-auto">
+                    <h2 className="text-xl font-bold mb-2">Cronologia Note</h2>
+                    <div className="space-y-3 max-h-96 overflow-y-auto">
                         {lead.notes.slice().reverse().map((note) => (
                             <div key={note._id} className="bg-gray-100 p-3 rounded-md text-sm">
-                                <p>{note.text}</p>
+                                <p className="whitespace-pre-wrap">{note.text}</p>
                                 <p className="text-xs text-gray-500 mt-1">Da: {note.employee?.email || 'N/A'} - {new Date(note.date).toLocaleString('it-IT')}</p>
                             </div>
                         ))}
-                        {lead.notes.length === 0 && <p className="text-gray-500">Nessuna nota presente.</p>}
+                        {lead.notes.length === 0 && <p className="text-gray-500 text-sm">Nessuna nota presente.</p>}
                     </div>
                 </div>
             </div>

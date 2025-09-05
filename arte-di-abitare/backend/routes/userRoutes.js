@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 
-const { requestOtp, verifyOtp } = require('../controllers/userController');
+const { requestOtp, verifyOtp, updateUserPhone } = require('../controllers/userController');
+const { protect } = require('../middleware/authMiddleware');
 
 // @desc    Request an OTP for a user
 // @route   POST /api/users/request-otp
@@ -12,5 +13,11 @@ router.post('/request-otp', requestOtp);
 // @route   POST /api/users/verify-otp
 // @access  Public
 router.post('/verify-otp', verifyOtp);
+
+// @desc    Update user's phone number
+// @route   POST /api/users/update-phone
+// @access  Private
+router.post('/update-phone', protect, updateUserPhone);
+
 
 module.exports = router;

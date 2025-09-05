@@ -2,7 +2,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import PropertyForm from '@/components/admin/PropertyForm';
-import type { PropertyData } from '@/components/admin/PropertyForm';
 import Link from 'next/link';
 
 export default function NewPropertyPage() {
@@ -10,24 +9,35 @@ export default function NewPropertyPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const handleSubmit = async (data: PropertyData) => {
+    const handleSubmit = async (data: FormData) => {
         setIsSaving(true);
         setError(null);
         try {
             const token = localStorage.getItem('employeeAuthToken');
-            if (!token) { router.push('/admin/login'); return; }
+            if (!token) {
+                router.push('/admin/login');
+                return;
+            }
+
+            // When sending FormData, DO NOT set the 'Content-Type' header.
+            // The browser will automatically set it to 'multipart/form-data' with the correct boundary.
             const res = await fetch('/api/properties', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify(data),
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: data, // Pass FormData directly
             });
+
             if (!res.ok) {
                 const errorData = await res.json();
                 throw new Error(errorData.message || 'Errore nella creazione dell\'immobile.');
             }
+
+            // Redirect on success
             router.push('/admin/immobili');
+
         } catch (err: any) {
             setError(err.message);
+            console.error("Failed to create property:", err);
         } finally {
             setIsSaving(false);
         }

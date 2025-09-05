@@ -1,5 +1,21 @@
 const mongoose = require('mongoose');
 
+const questionnaire1Schema = new mongoose.Schema({
+    sellToBuy: { type: String, enum: ['sì', 'no'] },
+    maxBudget: { type: String }, // Storing as string to accommodate various user inputs
+    needsMortgage: { type: String, enum: ['sì', 'no'] },
+    mortgagePercentage: { type: Number },
+    mortgagePreApproval: { type: String, enum: ['sì', 'no, ma ho già parlato con la mia banca...', 'no, desidero una consulenza gratuita'] },
+    purchaseTimeline: { type: String, enum: ['entro 3 mesi', 'entro 6 mesi', 'entro 1 anno', 'non ho fretta'] }
+}, { _id: false });
+
+const questionnaire2Schema = new mongoose.Schema({
+    searchZone: { type: String },
+    minBedrooms: { type: Number, enum: [1, 2, 3] },
+    mustHaveFeatures: { type: String },
+    searchDuration: { type: String } // e.g., 'da meno di un mese', '1-3 mesi', etc.
+}, { _id: false });
+
 const leadSchema = mongoose.Schema(
   {
     user: {
@@ -12,27 +28,20 @@ const leadSchema = mongoose.Schema(
       required: true,
       ref: 'Property',
     },
-    // Answers from the first questionnaire
-    qualificationAnswers: {
-      maxBudget: { type: String },
-      purchaseTimeline: { type: String },
-      mortgagePreApproval: { type: String },
-      isFirstHome: { type: String },
-      availabilityForVisit: { type: String },
-    },
-    // Answers from the second questionnaire (to be used later)
-    postViewingAnswers: {
-      searchZone: { type: String },
-      minBedrooms: { type: Number },
-      mustHaveFeatures: { type: String },
-      urgency: { type: String },
-      finalFeedback: { type: String },
-    },
+    questionnaire1: questionnaire1Schema,
+    questionnaire2: questionnaire2Schema,
     status: {
         type: String,
-        enum: ['Nuovo', 'Contattato', 'Da richiamare', 'Non interessato'],
+        enum: ['Nuovo', 'Contattato', 'Da richiamare', 'Non interessato', 'Cliente'],
         default: 'Nuovo'
     },
+    // Call Management
+    isContacted: { type: Boolean, default: false },
+    calledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee' },
+    callDate: { type: Date },
+    needsCallback: { type: Boolean, default: false },
+    callbackDate: { type: Date },
+    // Notes History
     notes: [
       {
         text: { type: String, required: true },

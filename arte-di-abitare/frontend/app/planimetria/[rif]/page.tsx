@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
+import Link from 'next/link';
 
-export default function FloorPlanPage() {
+export default function PlanimetryPage() {
   const params = useParams();
   const router = useRouter();
   const rif = params.rif as string;
@@ -11,7 +13,6 @@ export default function FloorPlanPage() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isZoomed, setIsZoomed] = useState(false);
 
   useEffect(() => {
     if (!rif) return;
@@ -30,15 +31,8 @@ export default function FloorPlanPage() {
         });
 
         if (!response.ok) {
-          // Try to parse error message if response is JSON, otherwise use status text
-          let errorMessage = `Errore nel caricamento della planimetria: ${response.statusText}`;
-          try {
-            const errorData = await response.json();
-            errorMessage = errorData.message || errorMessage;
-          } catch (e) {
-            // Response was not JSON, stick with the status text
-          }
-          throw new Error(errorMessage);
+          const errorData = await response.json();
+          throw new Error(errorData.message || `Errore nel caricamento della planimetria`);
         }
 
         const imageBlob = await response.blob();
@@ -53,7 +47,7 @@ export default function FloorPlanPage() {
 
     fetchWatermarkedImage();
 
-    // Cleanup function to revoke the object URL to prevent memory leaks
+    // Cleanup function to prevent memory leaks
     return () => {
       if (objectUrl) {
         URL.revokeObjectURL(objectUrl);
@@ -61,41 +55,39 @@ export default function FloorPlanPage() {
     };
   }, [rif]);
 
-  const handleNextStep = () => {
-    router.push(`/questionario2/${rif}`);
-  };
-
-  if (loading) {
-    return <div className="flex justify-center items-center min-h-screen bg-gray-100"><p className="text-xl">Caricamento planimetria...</p></div>;
-  }
-
-  if (error) {
-    return <div className="flex justify-center items-center min-h-screen bg-gray-100"><p className="text-red-600 text-xl text-center p-4">{error}</p></div>;
-  }
+  if (loading) return <div className="flex justify-center items-center min-h-screen bg-gray-100"><p className="text-xl">Caricamento planimetria con watermark...</p></div>;
+  if (error) return <div className="flex justify-center items-center min-h-screen bg-gray-100"><p className="text-red-600 text-xl text-center p-4">{error}</p></div>;
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-4xl bg-white rounded-xl shadow-xl p-8 text-center">
-        <h1 className="text-3xl font-bold text-blue-900 mb-2">Planimetria</h1>
+      <div className="w-full max-w-5xl bg-white rounded-xl shadow-xl p-8 text-center">
+        <h1 className="text-3xl font-bold text-gray-800 mb-2">Planimetria</h1>
         <p className="text-md text-gray-500 mb-6">RIF: {rif ? rif.toUpperCase() : ''}</p>
 
-        <p className="text-sm text-gray-600 mb-4">Clicca sull'immagine per ingrandire/rimpicciolire.</p>
+        <p className="text-sm text-gray-600 mb-4">Usa il mouse o il tocco per ingrandire e spostare l'immagine. Il download e lo screenshot sono disabilitati.</p>
 
-        <div className="w-full h-96 bg-gray-200 rounded-lg overflow-hidden cursor-pointer border" onClick={() => setIsZoomed(!isZoomed)}>
+        <div
+          className="w-full h-[60vh] bg-gray-200 rounded-lg overflow-hidden border-2 border-gray-300"
+          onContextMenu={(e) => e.preventDefault()} // Prevent right-click menu
+        >
           {imageUrl ? (
-            <img
-              src={imageUrl}
-              alt={`Planimetria per RIF ${rif}`}
-              className={`w-full h-full object-contain transition-transform duration-300 ease-in-out ${isZoomed ? 'scale-150' : 'scale-100'}`}
-            />
+            <TransformWrapper>
+              <TransformComponent wrapperStyle={{ width: "100%", height: "100%" }} contentStyle={{ width: "100%", height: "100%" }}>
+                <img
+                  src={imageUrl}
+                  alt={`Planimetria per RIF ${rif}`}
+                  className="w-full h-full object-contain"
+                />
+              </TransformComponent>
+            </TransformWrapper>
           ) : (
             <div className="w-full h-full flex items-center justify-center"><p>Nessuna immagine da visualizzare.</p></div>
           )}
         </div>
 
-        <button onClick={handleNextStep} className="mt-8 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg shadow-md transition-colors text-lg">
+        <Link href={`/questionario2/${rif}`} className="inline-block mt-8 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg shadow-md transition-colors text-lg">
           Prosegui
-        </button>
+        </Link>
       </div>
     </div>
   );

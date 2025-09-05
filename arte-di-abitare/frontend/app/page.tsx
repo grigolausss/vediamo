@@ -63,7 +63,9 @@ export default function Home() {
             </div>
             <div className="flex items-center">
               <input id="consent" type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} required className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"/>
-              <label htmlFor="consent" className="ml-2 block text-sm text-gray-900">Acconsento al trattamento dei dati personali</label>
+              <label htmlFor="consent" className="ml-2 block text-sm text-gray-900">
+                Acconsento al <Link href="/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline hover:text-blue-800">trattamento dei dati personali</Link>
+              </label>
             </div>
             {error && <p className="text-red-600 text-center text-sm">{error}</p>}
             <button type="submit" disabled={!consent || isLoading} className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400">
