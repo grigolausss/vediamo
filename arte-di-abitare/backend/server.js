@@ -1,10 +1,12 @@
-const express = require('express');
 const dotenv = require('dotenv');
+// Configure dotenv with debug mode to diagnose the issue.
+dotenv.config({ debug: true });
+
+const express = require('express');
 const connectDB = require('./config/db');
 const path = require('path');
 
-dotenv.config();
-
+// Connect to Database
 connectDB();
 
 const app = express();
@@ -18,7 +20,7 @@ app.use('/public', express.static(path.join(__dirname, 'public')));
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/properties', require('./routes/propertyRoutes'));
 app.use('/api/leads', require('./routes/leadRoutes'));
-app.use('/api/employees', require('./routes/employeeRoutes'));
+app.use('/api/employees',require('./routes/employeeRoutes'));
 app.use('/api/logs', require('./routes/activityLogRoutes'));
 
 app.get('/', (req, res) => {
