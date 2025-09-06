@@ -10,7 +10,6 @@ const generateEmployeeToken = (id) => {
   return jwt.sign({ id, type: 'employee' }, process.env.JWT_SECRET, { expiresIn: '1d' });
 };
 
-// New HTML template for the password reset email
 const generateResetPasswordEmailHtml = (name, resetUrl) => {
   return `
     <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: auto; border: 1px solid #ddd; border-radius: 10px; padding: 20px;">
@@ -29,22 +28,21 @@ const generateResetPasswordEmailHtml = (name, resetUrl) => {
   `;
 };
 
-
 // --- Controller Functions ---
 
 const loginEmployee = async (req, res) => {
     const { email, password } = req.body;
-    console.log(`[DEBUG] Attempting login for email: ${email}`); // DEBUG
+    console.log(`[DEBUG] Attempting login for email: ${email}`);
     if (!email || !password) {
         return res.status(400).json({ message: 'Per favore, fornisci email e password.' });
     }
     try {
         const employee = await Employee.findOne({ email });
-        console.log('[DEBUG] Employee found in DB:', employee ? `Yes, ID: ${employee._id}`: 'No'); // DEBUG
+        console.log('[DEBUG] Employee found in DB:', employee ? `Yes, ID: ${employee._id}`: 'No');
 
         if (employee) {
             const isMatch = await employee.matchPassword(password);
-            console.log('[DEBUG] Password match result:', isMatch); // DEBUG
+            console.log('[DEBUG] Password match result:', isMatch);
 
             if (isMatch) {
                 const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -65,8 +63,7 @@ const loginEmployee = async (req, res) => {
             }
         }
 
-        // If employee not found or password doesn't match
-        console.log('[DEBUG] Login failed: Invalid credentials.'); // DEBUG
+        console.log('[DEBUG] Login failed: Invalid credentials.');
         res.status(401).json({ message: 'Email o password non valide.' });
 
     } catch (error) {
@@ -105,17 +102,14 @@ const forgotPassword = async (req, res) => {
     try {
         const employee = await Employee.findOne({ email });
         if (!employee) {
-            // Security measure: always return a success message to prevent email enumeration
             return res.status(200).json({ message: 'Se l\'email è registrata, riceverai un link per il reset.' });
         }
 
         const resetToken = employee.getResetPasswordToken();
         await employee.save({ validateBeforeSave: false });
 
-        // FIX: The URL must point to the frontend application
         const resetUrl = `http://localhost:3000/admin/reset-password/${resetToken}`;
 
-        // FIX: Use the new HTML template for the reset email
         const textContent = `Hai richiesto un reset della password. Clicca su questo link (valido per 10 minuti): \n\n ${resetUrl}`;
         const htmlContent = generateResetPasswordEmailHtml(employee.email, resetUrl);
 
@@ -129,7 +123,6 @@ const forgotPassword = async (req, res) => {
         res.status(200).json({ message: 'Email per il reset della password inviata.' });
     } catch (error) {
         console.error(error);
-        // Clear the token if email sending fails to prevent a locked state
         const employee = await Employee.findOne({ email });
         if (employee) {
             employee.resetPasswordToken = undefined;
@@ -141,26 +134,22 @@ const forgotPassword = async (req, res) => {
 };
 
 const resetPassword = async (req, res) => {
-    // The token in the URL is the raw token. We need to hash it to find it in the DB.
     const resetPasswordToken = crypto.createHash('sha256').update(req.params.token).digest('hex');
     try {
         const employee = await Employee.findOne({ resetPasswordToken, resetPasswordExpire: { $gt: Date.now() } });
         if (!employee) {
             return res.status(400).json({ message: 'Token non valido o scaduto.' });
         }
-        // Set the new password
         employee.password = req.body.password;
         employee.resetPasswordToken = undefined;
         employee.resetPasswordExpire = undefined;
-        await employee.save(); // The 'pre-save' hook will hash the new password
+        await employee.save();
 
         res.status(200).json({ message: 'Password resettata con successo.' });
     } catch (error) {
         res.status(500).json({ message: 'Errore del server.' });
     }
 };
-
-// ... (rest of the functions remain the same)
 
 const createEmployee = async (req, res) => {
     const { email, password, role } = req.body;
@@ -221,7 +210,22 @@ const deleteEmployee = async (req, res) => {
     }
 };
 
+const updateMyPassword = async (req, res) => {
+    const employee = await Employee.findById(req.employee._id);
+    if (employee) {
+        if (req.body.password) {
+            employee.password = req.body.password;
+            await employee.save();
+            res.json({ message: 'Password aggiornata con successo.' });
+        } else {
+            res.status(400).json({ message: 'Per favore, fornisci una nuova password.' });
+        }
+    } else {
+        res.status(404).json({ message: 'Dipendente non trovato.' });
+    }
+};
+
 module.exports = {
     loginEmployee, verifyEmployeeOtp, forgotPassword, resetPassword, createEmployee,
-    getEmployees, getEmployeeById, updateEmployee, deleteEmployee,
+    getEmployees, getEmployeeById, updateEmployee, deleteEmployee, updateMyPassword,
 };
