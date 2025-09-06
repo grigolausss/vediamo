@@ -134,7 +134,8 @@ const forgotPassword = async (req, res) => {
 };
 
 const resetPassword = async (req, res) => {
-    const resetPasswordToken = crypto.createHash('sha256').update(req.params.token).digest('hex');
+    // FIX: The parameter name in the route is 'resettoken', not 'token'.
+    const resetPasswordToken = crypto.createHash('sha256').update(req.params.resettoken).digest('hex');
     try {
         const employee = await Employee.findOne({ resetPasswordToken, resetPasswordExpire: { $gt: Date.now() } });
         if (!employee) {
