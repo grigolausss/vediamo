@@ -8,10 +8,12 @@ export default function NewPropertyPage() {
     const router = useRouter();
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [message, setMessage] = useState<string | null>(null);
 
     const handleSubmit = async (data: FormData) => {
         setIsSaving(true);
         setError(null);
+        setMessage(null);
         try {
             const token = localStorage.getItem('employeeAuthToken');
             if (!token) {
@@ -19,27 +21,25 @@ export default function NewPropertyPage() {
                 return;
             }
 
-            // When sending FormData, DO NOT set the 'Content-Type' header.
-            // The browser will automatically set it to 'multipart/form-data' with the correct boundary.
             const res = await fetch('/api/properties', {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` },
-                body: data, // Pass FormData directly
+                body: data,
             });
 
+            const responseData = await res.json();
             if (!res.ok) {
-                const errorData = await res.json();
-                throw new Error(errorData.message || 'Errore nella creazione dell\'immobile.');
+                throw new Error(responseData.message || 'Errore nella creazione dell\'immobile.');
             }
 
-            // Redirect on success
-            router.push('/admin/immobili');
+            setMessage('Immobile creato con successo! Verrai reindirizzato...');
+            setTimeout(() => {
+                router.push('/admin/immobili');
+            }, 2000);
 
         } catch (err: any) {
             setError(err.message);
-            console.error("Failed to create property:", err);
-        } finally {
-            setIsSaving(false);
+            setIsSaving(false); // Stop loading only on error
         }
     };
 
@@ -51,6 +51,7 @@ export default function NewPropertyPage() {
                 </Link>
                 <h1 className="text-3xl font-bold">Aggiungi Nuovo Immobile</h1>
             </div>
+            {message && <p className="text-center text-green-600 bg-green-100 p-3 rounded-md mb-4">{message}</p>}
             <PropertyForm onSubmit={handleSubmit} isSaving={isSaving} error={error} />
         </div>
     );

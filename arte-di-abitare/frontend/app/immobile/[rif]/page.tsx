@@ -72,7 +72,7 @@ export default function PropertyDossierPage() {
             <h2 className="text-xl font-bold text-gray-700 mb-4 text-center">Dossier Immobile</h2>
             <div className="flex justify-center">
                 <img
-                    src={`${API_BASE_URL}${property.dossierImage}`}
+                    src={`${API_BASE_URL}/uploads/${property.dossierImage}`}
                     alt={`Dossier per ${property.title}`}
                     className="rounded-lg shadow-md max-w-full h-auto border"
                     style={{ maxHeight: '80vh' }}

@@ -43,14 +43,6 @@ const protectEmployee = async (req, res, next) => {
   }
 };
 
-const admin = (req, res, next) => {
-    if (req.employee && req.employee.role === 'Admin') {
-        next();
-    } else {
-        res.status(403);
-        // Using a simple json response for now
-        return res.json({ message: 'Non autorizzato come admin.' });
-    }
-};
+// The admin middleware is no longer needed as the 'role' concept is removed.
 
-module.exports = { protectEmployee, admin };
+module.exports = { protectEmployee };

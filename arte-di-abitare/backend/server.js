@@ -1,5 +1,5 @@
 const dotenv = require('dotenv');
-// Configure dotenv with debug mode to diagnose the issue.
+// Configure dotenv at the very top to ensure all env variables are loaded before any other module.
 dotenv.config({ debug: true });
 
 const express = require('express');
@@ -13,8 +13,8 @@ const app = express();
 
 app.use(express.json());
 
-// Serve static files from the 'public' directory
-app.use('/public', express.static(path.join(__dirname, 'public')));
+// FIX: Serve static files from the 'public/uploads' directory under the '/uploads' virtual path
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 
 // API routes
 app.use('/api/users', require('./routes/userRoutes'));

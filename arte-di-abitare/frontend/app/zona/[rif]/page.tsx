@@ -60,7 +60,7 @@ export default function ZonePage() {
 
                 <div className="mb-8 border rounded-lg p-4 bg-gray-50">
                     <img
-                        src={`${API_BASE_URL}${zoneData.zoneImage}`}
+                        src={`${API_BASE_URL}/uploads/${zoneData.zoneImage}`}
                         alt={`Zona per ${zoneData.title}`}
                         className="rounded-lg shadow-md max-w-full h-auto border"
                     />

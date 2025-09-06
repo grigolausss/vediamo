@@ -1,8 +1,9 @@
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
 const Employee = require('./models/employeeModel');
+
+// bcrypt is no longer needed here as the model handles hashing via pre-save hook
 
 dotenv.config();
 
@@ -12,8 +13,6 @@ const createAdminUser = async () => {
 
         const email = 'grigolocri004@gmail.com';
         const password = '1234ok';
-        // FIX: The role must match the enum in the schema ('Admin' or 'Agent')
-        const role = 'Admin';
 
         const employeeExists = await Employee.findOne({ email });
 
@@ -22,12 +21,9 @@ const createAdminUser = async () => {
             process.exit();
         }
 
-        // The pre-save hook in the model will handle hashing, so we can pass the plain password.
-        // This is a better approach as it respects the model's logic.
         const employee = new Employee({
             email,
-            password, // Pass plain password, the model will hash it
-            role,
+            password, // Pass plain password, the model's pre-save hook will hash it
         });
 
         await employee.save();

@@ -5,7 +5,6 @@ const jwt = require('jsonwebtoken');
 const logActivity = require('../utils/logger');
 
 // --- Helper Functions ---
-
 const generateEmployeeToken = (id) => {
   return jwt.sign({ id, type: 'employee' }, process.env.JWT_SECRET, { expiresIn: '1d' });
 };
@@ -32,51 +31,31 @@ const generateResetPasswordEmailHtml = (name, resetUrl) => {
 
 const loginEmployee = async (req, res) => {
     const { email, password } = req.body;
-    console.log(`[DEBUG] Attempting login for email: ${email}`);
-    if (!email || !password) {
-        return res.status(400).json({ message: 'Per favore, fornisci email e password.' });
-    }
     try {
         const employee = await Employee.findOne({ email });
-        console.log('[DEBUG] Employee found in DB:', employee ? `Yes, ID: ${employee._id}`: 'No');
-
-        if (employee) {
-            const isMatch = await employee.matchPassword(password);
-            console.log('[DEBUG] Password match result:', isMatch);
-
-            if (isMatch) {
-                const otp = Math.floor(100000 + Math.random() * 900000).toString();
-                employee.otp = otp;
-                employee.otpExpires = new Date(new Date().getTime() + 10 * 60 * 1000);
-                await employee.save();
-
-                const textContent = `Il tuo codice OTP per l'accesso all'area riservata è: ${otp}`;
-                const htmlContent = generateOtpEmailHtml(employee.email, otp);
-
-                await sendEmail({
-                    email: employee.email,
-                    subject: 'Codice di Accesso Area Riservata - Arte di Abitare',
-                    message: textContent,
-                    htmlContent: htmlContent,
-                });
-                return res.status(200).json({ message: `Accesso autorizzato. Ti abbiamo inviato un codice OTP via email.` });
-            }
+        if (employee && (await employee.matchPassword(password))) {
+            const otp = Math.floor(100000 + Math.random() * 900000).toString();
+            employee.otp = otp;
+            employee.otpExpires = new Date(new Date().getTime() + 10 * 60 * 1000);
+            await employee.save();
+            const textContent = `Il tuo codice OTP per l'accesso all'area riservata è: ${otp}`;
+            const htmlContent = generateOtpEmailHtml(employee.email, otp);
+            await sendEmail({
+                email: employee.email,
+                subject: 'Codice di Accesso Area Riservata - Arte di Abitare',
+                message: textContent,
+                htmlContent: htmlContent,
+            });
+            return res.status(200).json({ message: `Accesso autorizzato. Ti abbiamo inviato un codice OTP via email.` });
         }
-
-        console.log('[DEBUG] Login failed: Invalid credentials.');
         res.status(401).json({ message: 'Email o password non valide.' });
-
     } catch (error) {
-        console.error('Employee login error:', error);
         res.status(500).json({ message: 'Errore del server.' });
     }
 };
 
 const verifyEmployeeOtp = async (req, res) => {
     const { email, otp } = req.body;
-    if (!email || !otp) {
-        return res.status(400).json({ message: 'Per favore, fornisci email e OTP.' });
-    }
     try {
         const employee = await Employee.findOne({ email });
         if (!employee || !employee.otp || employee.otp !== otp || employee.otpExpires < new Date()) {
@@ -89,10 +68,9 @@ const verifyEmployeeOtp = async (req, res) => {
         res.status(200).json({
             message: 'Login effettuato con successo.',
             token: generateEmployeeToken(employee._id),
-            employee: { _id: employee._id, email: employee.email, role: employee.role },
+            employee: { _id: employee._id, email: employee.email },
         });
     } catch (error) {
-        console.error('Employee OTP verification error:', error);
         res.status(500).json({ message: 'Errore del server.' });
     }
 };
@@ -104,37 +82,24 @@ const forgotPassword = async (req, res) => {
         if (!employee) {
             return res.status(200).json({ message: 'Se l\'email è registrata, riceverai un link per il reset.' });
         }
-
         const resetToken = employee.getResetPasswordToken();
         await employee.save({ validateBeforeSave: false });
-
         const resetUrl = `http://localhost:3000/admin/reset-password/${resetToken}`;
-
-        const textContent = `Hai richiesto un reset della password. Clicca su questo link (valido per 10 minuti): \n\n ${resetUrl}`;
+        const textContent = `Hai richiesto un reset della password...`;
         const htmlContent = generateResetPasswordEmailHtml(employee.email, resetUrl);
-
         await sendEmail({
             email: employee.email,
             subject: 'Reset della Password - Arte di Abitare',
             message: textContent,
             htmlContent: htmlContent,
         });
-
         res.status(200).json({ message: 'Email per il reset della password inviata.' });
     } catch (error) {
-        console.error(error);
-        const employee = await Employee.findOne({ email });
-        if (employee) {
-            employee.resetPasswordToken = undefined;
-            employee.resetPasswordExpire = undefined;
-            await employee.save({ validateBeforeSave: false });
-        }
         res.status(500).json({ message: 'Errore durante l\'invio dell\'email.' });
     }
 };
 
 const resetPassword = async (req, res) => {
-    // FIX: The parameter name in the route is 'resettoken', not 'token'.
     const resetPasswordToken = crypto.createHash('sha256').update(req.params.resettoken).digest('hex');
     try {
         const employee = await Employee.findOne({ resetPasswordToken, resetPasswordExpire: { $gt: Date.now() } });
@@ -145,7 +110,6 @@ const resetPassword = async (req, res) => {
         employee.resetPasswordToken = undefined;
         employee.resetPasswordExpire = undefined;
         await employee.save();
-
         res.status(200).json({ message: 'Password resettata con successo.' });
     } catch (error) {
         res.status(500).json({ message: 'Errore del server.' });
@@ -153,15 +117,15 @@ const resetPassword = async (req, res) => {
 };
 
 const createEmployee = async (req, res) => {
-    const { email, password, role } = req.body;
+    const { email, password } = req.body;
     try {
         const employeeExists = await Employee.findOne({ email });
         if (employeeExists) {
             return res.status(400).json({ message: 'Un dipendente con questa email esiste già.' });
         }
-        const employee = await Employee.create({ email, password, role });
+        const employee = await Employee.create({ email, password });
         logActivity(req.employee._id, 'CREATE_EMPLOYEE', `Creato nuovo impiegato: ${employee.email}`);
-        res.status(201).json({ _id: employee._id, email: employee.email, role: employee.role });
+        res.status(201).json({ _id: employee._id, email: employee.email });
     } catch (error) {
         res.status(400).json({ message: 'Dati non validi.', error: error.message });
     }
@@ -185,13 +149,12 @@ const updateEmployee = async (req, res) => {
     const employee = await Employee.findById(req.params.id);
     if (employee) {
         employee.email = req.body.email || employee.email;
-        employee.role = req.body.role || employee.role;
         if (req.body.password) {
             employee.password = req.body.password;
         }
         const updatedEmployee = await employee.save();
         logActivity(req.employee._id, 'UPDATE_EMPLOYEE', `Aggiornato impiegato: ${updatedEmployee.email}`);
-        res.json({ _id: updatedEmployee._id, email: updatedEmployee.email, role: updatedEmployee.role });
+        res.json({ _id: updatedEmployee._id, email: updatedEmployee.email });
     } else {
         res.status(404).json({ message: 'Dipendente non trovato.' });
     }
@@ -201,7 +164,7 @@ const deleteEmployee = async (req, res) => {
     const employee = await Employee.findById(req.params.id);
     if (employee) {
         if (req.employee._id.equals(employee._id)) {
-            return res.status(400).json({ message: 'Non puoi eliminare il tuo account admin.' });
+            return res.status(400).json({ message: 'Non puoi eliminare il tuo account.' });
         }
         await employee.deleteOne();
         logActivity(req.employee._id, 'DELETE_EMPLOYEE', `Rimosso impiegato: ${employee.email}`);

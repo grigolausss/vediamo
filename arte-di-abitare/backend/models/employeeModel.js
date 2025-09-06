@@ -18,12 +18,6 @@ const employeeSchema = mongoose.Schema(
       required: [true, 'Per favore, inserisci una password.'],
       minlength: 6,
     },
-    role: {
-      type: String,
-      required: true,
-      enum: ['Admin', 'Agent'],
-      default: 'Agent',
-    },
     otp: {
       type: String,
     },

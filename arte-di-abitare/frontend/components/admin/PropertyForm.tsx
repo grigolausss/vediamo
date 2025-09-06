@@ -25,6 +25,8 @@ interface PropertyFormProps {
   error?: string | null;
 }
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 export default function PropertyForm({ initialData = {}, onSubmit, isSaving, error }: PropertyFormProps) {
   const [property, setProperty] = useState<Partial<PropertyData>>({
     rif: '',
@@ -38,28 +40,25 @@ export default function PropertyForm({ initialData = {}, onSubmit, isSaving, err
     planimetryImage: '',
     zoneImage: '',
     isActive: true,
-    ...initialData,
   });
 
   const [previews, setPreviews] = useState({
-      dossierImage: typeof initialData.dossierImage === 'string' ? initialData.dossierImage : undefined,
-      planimetryImage: typeof initialData.planimetryImage === 'string' ? initialData.planimetryImage : undefined,
-      zoneImage: typeof initialData.zoneImage === 'string' ? initialData.zoneImage : undefined,
+      dossierImage: '',
+      planimetryImage: '',
+      zoneImage: '',
   });
 
-  // This effect now safely populates the form when editing an existing property,
-  // without causing an infinite loop. It runs only when the component mounts
-  // or when the ID of the initial data changes.
   useEffect(() => {
-    if (initialData && Object.keys(initialData).length > 0) {
-        setProperty(prev => ({ ...prev, ...initialData }));
+    if (initialData && initialData._id) {
+        setProperty({ ...initialData });
+        // FIX: Construct full URLs for existing images for the previews
         setPreviews({
-            dossierImage: typeof initialData.dossierImage === 'string' ? initialData.dossierImage : undefined,
-            planimetryImage: typeof initialData.planimetryImage === 'string' ? initialData.planimetryImage : undefined,
-            zoneImage: typeof initialData.zoneImage === 'string' ? initialData.zoneImage : undefined,
+            dossierImage: typeof initialData.dossierImage === 'string' ? `${API_BASE_URL}/uploads/${initialData.dossierImage}` : '',
+            planimetryImage: typeof initialData.planimetryImage === 'string' ? `${API_BASE_URL}/uploads/${initialData.planimetryImage}` : '',
+            zoneImage: typeof initialData.zoneImage === 'string' ? `${API_BASE_URL}/uploads/${initialData.zoneImage}` : '',
         });
     }
-  }, [initialData?._id]); // Depend on a stable primitive value like the ID
+  }, [initialData?._id]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -71,6 +70,7 @@ export default function PropertyForm({ initialData = {}, onSubmit, isSaving, err
     if (files && files.length > 0) {
       const file = files[0];
       setProperty(prev => ({ ...prev, [name]: file }));
+      // Create a temporary local URL for the new image preview
       setPreviews(prev => ({...prev, [name]: URL.createObjectURL(file)}));
     }
   };

@@ -21,15 +21,15 @@ const storage = multer.diskStorage({
 
 // A more robust file type check focusing only on the mimetype
 function checkFileType(file, cb){
-  // Regular expression to match allowed image mimetypes
-  const filetypes = /jpeg|jpg|png|gif|webp/;
+  // Regular expression to match allowed image mimetypes, now including heic
+  const filetypes = /jpeg|jpg|png|gif|webp|heic/;
   const isMimeTypeAllowed = filetypes.test(file.mimetype);
 
   if (isMimeTypeAllowed) {
     return cb(null, true);
   } else {
     console.error(`[Upload Middleware] File rejected. Mimetype: ${file.mimetype}, Original Name: ${file.originalname}`);
-    cb(new Error('Errore: Solo file di tipo immagine sono ammessi (jpeg, png, gif, webp).'), false);
+    cb(new Error('Errore: Solo file di tipo immagine sono ammessi (jpeg, png, gif, webp, heic).'), false);
   }
 }
 

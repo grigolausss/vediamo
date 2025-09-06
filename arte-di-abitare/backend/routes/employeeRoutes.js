@@ -12,41 +12,29 @@ const {
     deleteEmployee,
     updateMyPassword
 } = require('../controllers/employeeController');
-const { protectEmployee, admin } = require('../middleware/employeeAuthMiddleware');
+// Removing 'admin' middleware as the role concept is being removed
+const { protectEmployee } = require('../middleware/employeeAuthMiddleware');
 
-// @desc    Auth employee (step 1: password check) & send OTP
-// @route   POST /api/employees/login
-// @access  Public
+// Public routes
 router.post('/login', loginEmployee);
-
-// @desc    Verify employee OTP (step 2) & get token
-// @route   POST /api/employees/login/verify-otp
-// @access  Public
 router.post('/login/verify-otp', verifyEmployeeOtp);
-
-// @desc    Forgot password
-// @route   POST /api/employees/forgot-password
-// @access  Public
 router.post('/forgot-password', forgotPassword);
-
-// @desc    Reset password
-// @route   PUT /api/employees/reset-password/:resettoken
-// @access  Public
 router.put('/reset-password/:resettoken', resetPassword);
 
+// --- Protected Employee Routes ---
 
-// --- Admin Routes ---
+// All employees can now perform these actions
 router.route('/')
-    .post(protectEmployee, admin, createEmployee)
-    .get(protectEmployee, admin, getEmployees);
+    .post(protectEmployee, createEmployee)
+    .get(protectEmployee, getEmployees);
 
 router.route('/profile/password')
     .put(protectEmployee, updateMyPassword);
 
 router.route('/:id')
-    .get(protectEmployee, admin, getEmployeeById)
-    .put(protectEmployee, admin, updateEmployee)
-    .delete(protectEmployee, admin, deleteEmployee);
+    .get(protectEmployee, getEmployeeById)
+    .put(protectEmployee, updateEmployee)
+    .delete(protectEmployee, deleteEmployee);
 
 
 module.exports = router;

@@ -9,10 +9,12 @@ export default function NewUserPage() {
     const router = useRouter();
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [message, setMessage] = useState<string | null>(null);
 
     const handleSubmit = async (data: EmployeeData) => {
         setIsSaving(true);
         setError(null);
+        setMessage(null);
         try {
             const token = localStorage.getItem('employeeAuthToken');
             if (!token) { router.push('/admin/login'); return; }
@@ -21,16 +23,19 @@ export default function NewUserPage() {
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify(data),
             });
+            const responseData = await res.json();
             if (!res.ok) {
-                const errorData = await res.json();
-                throw new Error(errorData.message || 'Errore nella creazione dell\'utente.');
+                throw new Error(responseData.message || 'Errore nella creazione dell\'utente.');
             }
-            router.push('/admin/utenti');
+            setMessage('Utente creato con successo! Verrai reindirizzato...');
+            setTimeout(() => {
+                router.push('/admin/utenti');
+            }, 2000);
         } catch (err: any) {
             setError(err.message);
-        } finally {
-            setIsSaving(false);
+            setIsSaving(false); // Stop loading on error
         }
+        // No finally block needed here, as we only stop loading on error or navigate away on success
     };
 
     return (
@@ -41,6 +46,7 @@ export default function NewUserPage() {
                 </Link>
                 <h1 className="text-3xl font-bold">Aggiungi Nuovo Utente</h1>
             </div>
+            {message && <p className="text-center text-green-600 bg-green-100 p-3 rounded-md mb-4">{message}</p>}
             <EmployeeForm onSubmit={handleSubmit} isSaving={isSaving} error={error} isEditing={false} />
         </div>
     );
