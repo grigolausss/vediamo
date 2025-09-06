@@ -12,7 +12,7 @@ const {
     getAlternatives // Added new function
 } = require('../controllers/propertyController');
 const { protect } = require('../middleware/authMiddleware');
-const { protectEmployee, admin } = require('../middleware/employeeAuthMiddleware');
+const { protectEmployee } = require('../middleware/employeeAuthMiddleware');
 const upload = require('../middleware/uploadMiddleware');
 
 // === Public User Routes ===
@@ -35,6 +35,6 @@ router.route('/')
 router.route('/:id')
     .get(protectEmployee, getPropertyById)
     .put(protectEmployee, upload, updateProperty)
-    .delete(protectEmployee, admin, deleteProperty);
+    .delete(protectEmployee, deleteProperty);
 
 module.exports = router;
