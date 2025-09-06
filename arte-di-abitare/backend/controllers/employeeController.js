@@ -4,35 +4,71 @@ const { sendEmail, generateOtpEmailHtml } = require('../utils/sendEmail');
 const jwt = require('jsonwebtoken');
 const logActivity = require('../utils/logger');
 
+// --- Helper Functions ---
+
 const generateEmployeeToken = (id) => {
   return jwt.sign({ id, type: 'employee' }, process.env.JWT_SECRET, { expiresIn: '1d' });
 };
 
+// New HTML template for the password reset email
+const generateResetPasswordEmailHtml = (name, resetUrl) => {
+  return `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: auto; border: 1px solid #ddd; border-radius: 10px; padding: 20px;">
+      <h2 style="color: #0d47a1; text-align: center;">Reset della Password</h2>
+      <p>Ciao ${name},</p>
+      <p>Abbiamo ricevuto una richiesta di reset della password per il tuo account.</p>
+      <p>Per favore, clicca sul link qui sotto per impostare una nuova password. Il link è valido per 10 minuti.</p>
+      <div style="text-align: center; margin: 20px 0;">
+        <a href="${resetUrl}" style="background-color: #0d47a1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
+          Resetta Password
+        </a>
+      </div>
+      <p>Se non hai richiesto tu questo reset, puoi tranquillamente ignorare questa email.</p>
+      <p>Grazie,<br>Il team di Arte di Abitare</p>
+    </div>
+  `;
+};
+
+
+// --- Controller Functions ---
+
 const loginEmployee = async (req, res) => {
     const { email, password } = req.body;
+    console.log(`[DEBUG] Attempting login for email: ${email}`); // DEBUG
     if (!email || !password) {
         return res.status(400).json({ message: 'Per favore, fornisci email e password.' });
     }
     try {
         const employee = await Employee.findOne({ email });
-        if (employee && (await employee.matchPassword(password))) {
-            const otp = Math.floor(100000 + Math.random() * 900000).toString();
-            employee.otp = otp;
-            employee.otpExpires = new Date(new Date().getTime() + 10 * 60 * 1000);
-            await employee.save();
-            const textContent = `Il tuo codice OTP per l'accesso all'area riservata è: ${otp}`;
-            const htmlContent = generateOtpEmailHtml(employee.email, otp); // Using email as name for employees
+        console.log('[DEBUG] Employee found in DB:', employee ? `Yes, ID: ${employee._id}`: 'No'); // DEBUG
 
-            await sendEmail({
-                email: employee.email,
-                subject: 'Codice di Accesso Area Riservata - Arte di Abitare',
-                message: textContent,
-                htmlContent: htmlContent,
-            });
-            res.status(200).json({ message: `Accesso autorizzato. Ti abbiamo inviato un codice OTP via email.` });
-        } else {
-            res.status(401).json({ message: 'Email o password non valide.' });
+        if (employee) {
+            const isMatch = await employee.matchPassword(password);
+            console.log('[DEBUG] Password match result:', isMatch); // DEBUG
+
+            if (isMatch) {
+                const otp = Math.floor(100000 + Math.random() * 900000).toString();
+                employee.otp = otp;
+                employee.otpExpires = new Date(new Date().getTime() + 10 * 60 * 1000);
+                await employee.save();
+
+                const textContent = `Il tuo codice OTP per l'accesso all'area riservata è: ${otp}`;
+                const htmlContent = generateOtpEmailHtml(employee.email, otp);
+
+                await sendEmail({
+                    email: employee.email,
+                    subject: 'Codice di Accesso Area Riservata - Arte di Abitare',
+                    message: textContent,
+                    htmlContent: htmlContent,
+                });
+                return res.status(200).json({ message: `Accesso autorizzato. Ti abbiamo inviato un codice OTP via email.` });
+            }
         }
+
+        // If employee not found or password doesn't match
+        console.log('[DEBUG] Login failed: Invalid credentials.'); // DEBUG
+        res.status(401).json({ message: 'Email o password non valide.' });
+
     } catch (error) {
         console.error('Employee login error:', error);
         res.status(500).json({ message: 'Errore del server.' });
@@ -69,40 +105,62 @@ const forgotPassword = async (req, res) => {
     try {
         const employee = await Employee.findOne({ email });
         if (!employee) {
+            // Security measure: always return a success message to prevent email enumeration
             return res.status(200).json({ message: 'Se l\'email è registrata, riceverai un link per il reset.' });
         }
+
         const resetToken = employee.getResetPasswordToken();
         await employee.save({ validateBeforeSave: false });
-        const resetUrl = `${req.protocol}://${req.get('host')}/employee/reset-password/${resetToken}`;
-        const message = `Hai richiesto un reset della password. Clicca su questo link: \n\n ${resetUrl}`;
+
+        // FIX: The URL must point to the frontend application
+        const resetUrl = `http://localhost:3000/admin/reset-password/${resetToken}`;
+
+        // FIX: Use the new HTML template for the reset email
+        const textContent = `Hai richiesto un reset della password. Clicca su questo link (valido per 10 minuti): \n\n ${resetUrl}`;
+        const htmlContent = generateResetPasswordEmailHtml(employee.email, resetUrl);
+
         await sendEmail({
             email: employee.email,
             subject: 'Reset della Password - Arte di Abitare',
-            message,
+            message: textContent,
+            htmlContent: htmlContent,
         });
+
         res.status(200).json({ message: 'Email per il reset della password inviata.' });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Errore del server.' });
+        // Clear the token if email sending fails to prevent a locked state
+        const employee = await Employee.findOne({ email });
+        if (employee) {
+            employee.resetPasswordToken = undefined;
+            employee.resetPasswordExpire = undefined;
+            await employee.save({ validateBeforeSave: false });
+        }
+        res.status(500).json({ message: 'Errore durante l\'invio dell\'email.' });
     }
 };
 
 const resetPassword = async (req, res) => {
-    const resetPasswordToken = crypto.createHash('sha256').update(req.params.resettoken).digest('hex');
+    // The token in the URL is the raw token. We need to hash it to find it in the DB.
+    const resetPasswordToken = crypto.createHash('sha256').update(req.params.token).digest('hex');
     try {
         const employee = await Employee.findOne({ resetPasswordToken, resetPasswordExpire: { $gt: Date.now() } });
         if (!employee) {
             return res.status(400).json({ message: 'Token non valido o scaduto.' });
         }
+        // Set the new password
         employee.password = req.body.password;
         employee.resetPasswordToken = undefined;
         employee.resetPasswordExpire = undefined;
-        await employee.save();
+        await employee.save(); // The 'pre-save' hook will hash the new password
+
         res.status(200).json({ message: 'Password resettata con successo.' });
     } catch (error) {
         res.status(500).json({ message: 'Errore del server.' });
     }
 };
+
+// ... (rest of the functions remain the same)
 
 const createEmployee = async (req, res) => {
     const { email, password, role } = req.body;
@@ -163,22 +221,7 @@ const deleteEmployee = async (req, res) => {
     }
 };
 
-const updateMyPassword = async (req, res) => {
-    const employee = await Employee.findById(req.employee._id);
-    if (employee) {
-        if (req.body.password) {
-            employee.password = req.body.password;
-            await employee.save();
-            res.json({ message: 'Password aggiornata con successo.' });
-        } else {
-            res.status(400).json({ message: 'Per favore, fornisci una nuova password.' });
-        }
-    } else {
-        res.status(404).json({ message: 'Dipendente non trovato.' });
-    }
-};
-
 module.exports = {
     loginEmployee, verifyEmployeeOtp, forgotPassword, resetPassword, createEmployee,
-    getEmployees, getEmployeeById, updateEmployee, deleteEmployee, updateMyPassword,
+    getEmployees, getEmployeeById, updateEmployee, deleteEmployee,
 };
