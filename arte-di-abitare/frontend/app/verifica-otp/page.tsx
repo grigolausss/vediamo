@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 function VerifyOtpComponent() {
@@ -11,12 +11,51 @@ function VerifyOtpComponent() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // State for the resend functionality
+    const [countdown, setCountdown] = useState(60);
+    const [resendDisabled, setResendDisabled] = useState(true);
+    const [resendMessage, setResendMessage] = useState('');
+
+    // Timer effect
+    useEffect(() => {
+        if (countdown > 0) {
+            const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+            return () => clearTimeout(timer);
+        } else {
+            setResendDisabled(false);
+        }
+    }, [countdown]);
+
     useEffect(() => {
         if (!email) {
-            // If no email is in the URL, redirect to home
             router.push('/');
         }
     }, [email, router]);
+
+    const handleResendOtp = useCallback(async () => {
+        if (!email) return;
+
+        setResendDisabled(true);
+        setResendMessage('Invio di un nuovo codice...');
+
+        // We need name and surname for the request-otp endpoint.
+        // Since we don't have them here, we'll pass placeholder values.
+        // The backend logic will find the existing user by email and ignore these.
+        const res = await fetch('/api/users/request-otp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: 'Utente', surname: 'Esistente', email }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+            setResendMessage(data.message || 'Errore durante l\'invio.');
+            setResendDisabled(false); // Allow another try
+        } else {
+            setResendMessage('Un nuovo codice è stato inviato alla tua email.');
+            setCountdown(60); // Restart the timer
+        }
+    }, [email]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -32,9 +71,7 @@ function VerifyOtpComponent() {
             if (!res.ok) {
                 throw new Error(data.message || 'Errore durante la verifica del codice OTP.');
             }
-            // Save the token for the public user session
             localStorage.setItem('authToken', data.token);
-            // Redirect to the RIF search page
             router.push('/cerca-rif');
         } catch (err: any) {
             setError(err.message);
@@ -59,12 +96,18 @@ function VerifyOtpComponent() {
                         {isLoading ? 'Verifico...' : 'Verifica e Continua'}
                     </button>
                 </form>
+
+                <div className="mt-6 text-center border-t pt-4">
+                    <button onClick={handleResendOtp} disabled={resendDisabled} className="text-blue-600 hover:underline disabled:text-gray-400 disabled:cursor-not-allowed text-sm">
+                        {resendDisabled ? `Rinvia codice tra ${countdown}s` : 'Rinvia codice'}
+                    </button>
+                    {resendMessage && <p className="text-sm text-gray-600 mt-2">{resendMessage}</p>}
+                </div>
             </div>
         </div>
     );
 }
 
-// Using Suspense is a good practice when using useSearchParams
 export default function VerifyOtpPage() {
     return (
         <Suspense fallback={<div>Caricamento...</div>}>

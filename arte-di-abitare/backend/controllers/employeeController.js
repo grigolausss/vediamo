@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const Employee = require('../models/employeeModel');
-const sendEmail = require('../utils/sendEmail');
+const { sendEmail, generateOtpEmailHtml } = require('../utils/sendEmail');
 const jwt = require('jsonwebtoken');
 const logActivity = require('../utils/logger');
 
@@ -20,10 +20,14 @@ const loginEmployee = async (req, res) => {
             employee.otp = otp;
             employee.otpExpires = new Date(new Date().getTime() + 10 * 60 * 1000);
             await employee.save();
+            const textContent = `Il tuo codice OTP per l'accesso all'area riservata è: ${otp}`;
+            const htmlContent = generateOtpEmailHtml(employee.email, otp); // Using email as name for employees
+
             await sendEmail({
                 email: employee.email,
                 subject: 'Codice di Accesso Area Riservata - Arte di Abitare',
-                message: `Il tuo codice OTP per l'accesso all'area riservata è: ${otp}`,
+                message: textContent,
+                htmlContent: htmlContent,
             });
             res.status(200).json({ message: `Accesso autorizzato. Ti abbiamo inviato un codice OTP via email.` });
         } else {

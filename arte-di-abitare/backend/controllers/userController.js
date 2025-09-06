@@ -1,5 +1,5 @@
 const User = require('../models/userModel');
-const sendEmail = require('../utils/sendEmail');
+const { sendEmail, generateOtpEmailHtml } = require('../utils/sendEmail');
 const jwt = require('jsonwebtoken');
 
 // Function to generate JWT
@@ -44,11 +44,15 @@ const requestOtp = async (req, res) => {
     await user.save();
 
     try {
-      const message = `Il tuo codice OTP è: ${otp}\nQuesto codice scadrà tra 10 minuti.`;
+      // Generate both HTML and plain text content for the email
+      const htmlContent = generateOtpEmailHtml(user.name, otp);
+      const textContent = `Il tuo codice OTP è: ${otp}. Questo codice scadrà tra 10 minuti.`;
+
       await sendEmail({
         email: user.email,
         subject: 'Il tuo codice di verifica - Arte di Abitare',
-        message,
+        message: textContent, // Fallback for plain text clients
+        htmlContent: htmlContent,
       });
 
       res.status(200).json({

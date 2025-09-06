@@ -12,7 +12,8 @@ const createAdminUser = async () => {
 
         const email = 'grigolocri004@gmail.com';
         const password = '1234ok';
-        const role = 'admin'; // Assuming 'admin' is a valid role
+        // FIX: The role must match the enum in the schema ('Admin' or 'Agent')
+        const role = 'Admin';
 
         const employeeExists = await Employee.findOne({ email });
 
@@ -21,12 +22,11 @@ const createAdminUser = async () => {
             process.exit();
         }
 
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
-
+        // The pre-save hook in the model will handle hashing, so we can pass the plain password.
+        // This is a better approach as it respects the model's logic.
         const employee = new Employee({
             email,
-            password: hashedPassword,
+            password, // Pass plain password, the model will hash it
             role,
         });
 
