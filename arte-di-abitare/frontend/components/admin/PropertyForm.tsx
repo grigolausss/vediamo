@@ -47,14 +47,19 @@ export default function PropertyForm({ initialData = {}, onSubmit, isSaving, err
       zoneImage: typeof initialData.zoneImage === 'string' ? initialData.zoneImage : undefined,
   });
 
+  // This effect now safely populates the form when editing an existing property,
+  // without causing an infinite loop. It runs only when the component mounts
+  // or when the ID of the initial data changes.
   useEffect(() => {
-    setProperty(prev => ({ ...prev, ...initialData }));
-    setPreviews({
-        dossierImage: typeof initialData.dossierImage === 'string' ? initialData.dossierImage : undefined,
-        planimetryImage: typeof initialData.planimetryImage === 'string' ? initialData.planimetryImage : undefined,
-        zoneImage: typeof initialData.zoneImage === 'string' ? initialData.zoneImage : undefined,
-    });
-  }, [initialData]);
+    if (initialData && Object.keys(initialData).length > 0) {
+        setProperty(prev => ({ ...prev, ...initialData }));
+        setPreviews({
+            dossierImage: typeof initialData.dossierImage === 'string' ? initialData.dossierImage : undefined,
+            planimetryImage: typeof initialData.planimetryImage === 'string' ? initialData.planimetryImage : undefined,
+            zoneImage: typeof initialData.zoneImage === 'string' ? initialData.zoneImage : undefined,
+        });
+    }
+  }, [initialData?._id]); // Depend on a stable primitive value like the ID
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;

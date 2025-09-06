@@ -23,7 +23,10 @@ const searchProperty = async (req, res) => {
 
     if (!rif) { return res.status(400).json({ message: 'Per favore, fornisci un codice RIF.' }); }
     try {
-        const property = await Property.findOne({ rif: rif.trim().toUpperCase() });
+        // Normalize the RIF: remove all whitespace and convert to uppercase
+        const normalizedRif = rif.replace(/\s/g, '').toUpperCase();
+        const property = await Property.findOne({ rif: normalizedRif });
+
         if (!property || !property.isActive) {
             return res.status(404).json({ message: 'Immobile non trovato o non attivo.' });
         }

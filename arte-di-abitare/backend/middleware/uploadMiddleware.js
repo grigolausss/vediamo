@@ -19,19 +19,17 @@ const storage = multer.diskStorage({
   }
 });
 
-// Check file type function
+// A more robust file type check focusing only on the mimetype
 function checkFileType(file, cb){
-  // Allowed extensions
+  // Regular expression to match allowed image mimetypes
   const filetypes = /jpeg|jpg|png|gif|webp/;
-  // Check extension
-  const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-  // Check mime type
-  const mimetype = filetypes.test(file.mimetype);
+  const isMimeTypeAllowed = filetypes.test(file.mimetype);
 
-  if(mimetype && extname){
+  if (isMimeTypeAllowed) {
     return cb(null, true);
   } else {
-    cb(new Error('Error: Images Only! Allowed types are jpeg, jpg, png, gif, webp.'), false);
+    console.error(`[Upload Middleware] File rejected. Mimetype: ${file.mimetype}, Original Name: ${file.originalname}`);
+    cb(new Error('Errore: Solo file di tipo immagine sono ammessi (jpeg, png, gif, webp).'), false);
   }
 }
 
