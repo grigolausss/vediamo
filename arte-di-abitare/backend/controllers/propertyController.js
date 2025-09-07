@@ -92,7 +92,8 @@ const getWatermarkedFloorPlan = async (req, res) => {
         const userEmail = req.user.email;
         const currentDate = new Date().toLocaleString('it-IT', { timeZone: 'Europe/Rome' });
         const watermarkText = `${userEmail}   ${currentDate}`;
-        const svgWatermark = `<svg width="500" height="100"><text x="10" y="50" font-family="Arial" font-size="16" fill="rgba(0, 0, 0, 0.3)" transform="rotate(-15)">${watermarkText}</text></svg>`;
+        // Increased font size and adjusted other SVG attributes for better visibility
+        const svgWatermark = `<svg width="700" height="140"><text x="20" y="80" font-family="Arial, sans-serif" font-weight="bold" font-size="32" fill="rgba(0, 0, 0, 0.2)" transform="rotate(-25)">${watermarkText}</text></svg>`;
         const svgBuffer = Buffer.from(svgWatermark);
         const watermarkedImageBuffer = await sharp(imageBuffer)
             .composite([{ input: svgBuffer, tile: true, blend: 'over' }])

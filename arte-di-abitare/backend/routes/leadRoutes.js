@@ -3,12 +3,12 @@ const router = express.Router();
 const {
     submitQuestionnaire1,
     submitQuestionnaire2,
-    handleFinalStep,
-    getLeads,
+    getHotLeads,
+    getWarmLeads,
+    getIncompleteLeads,
+    getTodaysReminders,
     getLeadById,
-    updateLeadStatus,
-    updateLeadCallDetails,
-    getTodaysReminders // Import the new function
+    updateLeadCallDetails
 } = require('../controllers/leadController');
 const { protect } = require('../middleware/authMiddleware');
 const { protectEmployee } = require('../middleware/employeeAuthMiddleware');
@@ -16,21 +16,13 @@ const { protectEmployee } = require('../middleware/employeeAuthMiddleware');
 // === Public User Routes ===
 router.post('/questionnaire1', protect, submitQuestionnaire1);
 router.post('/questionnaire2', protect, submitQuestionnaire2);
-router.post('/final-step', protect, handleFinalStep);
-
 
 // === Employee Dashboard Routes ===
-// @desc    Get leads with a callback reminder for today
-// @route   GET /api/leads/reminders/today
-// @access  Private/Employee
+router.get('/hot', protectEmployee, getHotLeads);
+router.get('/warm', protectEmployee, getWarmLeads);
+router.get('/incomplete', protectEmployee, getIncompleteLeads);
 router.get('/reminders/today', protectEmployee, getTodaysReminders);
-
-router.get('/', protectEmployee, getLeads);
 router.get('/:id', protectEmployee, getLeadById);
 router.put('/:id/call-details', protectEmployee, updateLeadCallDetails);
-
-// This route is deprecated
-router.put('/:id/status', protectEmployee, updateLeadStatus);
-
 
 module.exports = router;

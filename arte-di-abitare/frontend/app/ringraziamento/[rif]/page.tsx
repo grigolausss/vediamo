@@ -26,7 +26,7 @@ export default function ThankYouPage() {
             const response = await fetch('/api/users/update-phone', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ phone }),
+                body: JSON.stringify({ phone, rif }),
             });
 
             if (!response.ok) {

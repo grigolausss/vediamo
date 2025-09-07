@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
-// Updated Lead interface for the dashboard
+// Lead interface for the dashboard cards
 interface Lead {
   _id: string;
   user: { name: string; surname: string; email: string; phone?: string; };
@@ -31,66 +31,48 @@ const LeadCard = ({ lead }: { lead: Lead }) => (
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [allLeads, setAllLeads] = useState<Lead[]>([]);
+  const [hotLeads, setHotLeads] = useState<Lead[]>([]);
+  const [warmLeads, setWarmLeads] = useState<Lead[]>([]);
+  const [incompleteLeads, setIncompleteLeads] = useState<Lead[]>([]);
   const [reminders, setReminders] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // State for search and sort
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortOrder, setSortOrder] = useState('più recenti');
-
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      setError(null);
-      try {
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
         const token = localStorage.getItem('employeeAuthToken');
         if (!token) { router.push('/admin/login'); return; }
+        const headers = { 'Authorization': `Bearer ${token}` };
 
-        // Fetch all leads (will be updated to support query params)
-        const leadsRes = await fetch('/api/leads', { headers: { 'Authorization': `Bearer ${token}` } });
-        if (!leadsRes.ok) throw new Error('Errore nel caricamento dei lead.');
-        const leadsData = await leadsRes.json();
-        setAllLeads(leadsData);
+        // Fetch all lead categories in parallel
+        const [hotRes, warmRes, incompleteRes, remindersRes] = await Promise.all([
+            fetch('/api/leads/hot', { headers }),
+            fetch('/api/leads/warm', { headers }),
+            fetch('/api/leads/incomplete', { headers }),
+            fetch('/api/leads/reminders/today', { headers })
+        ]);
 
-        // Fetch today's reminders (from a new endpoint)
-        const remindersRes = await fetch('/api/leads/reminders/today', { headers: { 'Authorization': `Bearer ${token}` } });
-        if (!remindersRes.ok) throw new Error('Errore nel caricamento dei promemoria.');
-        const remindersData = await remindersRes.json();
-        setReminders(remindersData);
+        if (!hotRes.ok || !warmRes.ok || !incompleteRes.ok || !remindersRes.ok) {
+            throw new Error('Errore nel caricamento dei dati della dashboard.');
+        }
 
-      } catch (err: any) { setError(err.message); }
-      finally { setLoading(false); }
-    };
-    fetchData();
+        setHotLeads(await hotRes.json());
+        setWarmLeads(await warmRes.json());
+        setIncompleteLeads(await incompleteRes.json());
+        setReminders(await remindersRes.json());
+
+    } catch (err: any) {
+        setError(err.message);
+    } finally {
+        setLoading(false);
+    }
   }, [router]);
 
-  const handleClearSearch = () => {
-      setSearchQuery('');
-  };
-
-  const filteredAndSortedLeads = useMemo(() => {
-      let filtered = allLeads;
-
-      if (searchQuery) {
-          filtered = allLeads.filter(lead =>
-              `${lead.user.name} ${lead.user.surname}`.toLowerCase().includes(searchQuery.toLowerCase())
-          );
-      }
-
-      switch(sortOrder) {
-          case 'meno recenti': return filtered.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-          case 'nome crescente': return filtered.sort((a, b) => a.user.name.localeCompare(b.user.name));
-          case 'nome decrescente': return filtered.sort((a, b) => b.user.name.localeCompare(a.user.name));
-          case 'più recenti':
-          default:
-              return filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      }
-  }, [allLeads, searchQuery, sortOrder]);
-
-  const leadsToCallNow = useMemo(() => filteredAndSortedLeads.filter(lead => lead.status === 'Da richiamare' && lead.callbackDate && new Date(lead.callbackDate) < new Date()), [filteredAndSortedLeads]);
-  const leadsToCallBack = useMemo(() => filteredAndSortedLeads.filter(lead => lead.status === 'Da richiamare' && (!lead.callbackDate || new Date(lead.callbackDate) >= new Date())), [filteredAndSortedLeads]);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   if (loading) return <p className="text-center">Caricamento dashboard...</p>;
   if (error) return <p className="text-center text-red-600">Errore: {error}</p>;
@@ -99,19 +81,8 @@ export default function DashboardPage() {
     <div className="space-y-8">
       <h1 className="text-3xl font-bold">Dashboard Lead</h1>
 
-      {/* Search and Sort Controls */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-white rounded-lg shadow">
-          <input type="text" placeholder="Cerca per nome e cognome..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="p-2 border rounded-md"/>
-          <div className="flex gap-2">
-            <button onClick={() => { /* Implement search logic */ }} className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Cerca</button>
-            <button onClick={handleClearSearch} className="bg-gray-300 text-black px-4 py-2 rounded-md hover:bg-gray-400">Pulisci</button>
-          </div>
-          <select value={sortOrder} onChange={e => setSortOrder(e.target.value)} className="p-2 border rounded-md">
-              <option>più recenti</option><option>meno recenti</option><option>nome crescente</option><option>nome decrescente</option>
-          </select>
-      </div>
+      {/* Search is a complex feature to add on top of this structure, will be implemented later if needed */}
 
-      {/* Today's Reminders */}
       <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded-lg shadow-lg">
           <h2 className="text-2xl font-bold mb-2">Promemoria di Oggi</h2>
           <div className="space-y-2">
@@ -124,18 +95,23 @@ export default function DashboardPage() {
           </div>
       </div>
 
-      {/* Lead Columns */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div>
-              <h2 className="text-2xl font-bold text-red-600 mb-4">Da Richiamare Subito (scaduti)</h2>
+              <h2 className="text-2xl font-bold text-red-600 mb-4">Da Richiamare Subito</h2>
               <div className="space-y-4 max-h-[60vh] overflow-y-auto p-2 bg-gray-100 rounded-md">
-                  {leadsToCallNow.length > 0 ? leadsToCallNow.map(lead => <LeadCard key={lead._id} lead={lead}/>) : <p className="text-gray-500 p-4">Nessun lead scaduto.</p>}
+                  {hotLeads.length > 0 ? hotLeads.map(lead => <LeadCard key={lead._id} lead={lead}/>) : <p className="text-gray-500 p-4">Nessun lead da richiamare subito.</p>}
               </div>
           </div>
           <div>
               <h2 className="text-2xl font-bold text-green-600 mb-4">Da Richiamare</h2>
               <div className="space-y-4 max-h-[60vh] overflow-y-auto p-2 bg-gray-100 rounded-md">
-                  {leadsToCallBack.length > 0 ? leadsToCallBack.map(lead => <LeadCard key={lead._id} lead={lead}/>) : <p className="text-gray-500 p-4">Nessun lead da richiamare.</p>}
+                  {warmLeads.length > 0 ? warmLeads.map(lead => <LeadCard key={lead._id} lead={lead}/>) : <p className="text-gray-500 p-4">Nessun lead da richiamare.</p>}
+              </div>
+          </div>
+          <div>
+              <h2 className="text-2xl font-bold text-gray-600 mb-4">Lead non Completati</h2>
+              <div className="space-y-4 max-h-[60vh] overflow-y-auto p-2 bg-gray-100 rounded-md">
+                  {incompleteLeads.length > 0 ? incompleteLeads.map(lead => <LeadCard key={lead._id} lead={lead}/>) : <p className="text-gray-500 p-4">Nessun lead incompleto.</p>}
               </div>
           </div>
       </div>
