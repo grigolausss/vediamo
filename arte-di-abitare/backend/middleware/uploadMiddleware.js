@@ -2,7 +2,9 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-const uploadDir = 'arte-di-abitare/backend/public/uploads';
+// FIX: Use an absolute path to ensure files are always saved in the correct location,
+// regardless of the current working directory.
+const uploadDir = path.join(__dirname, '..', 'public', 'uploads');
 
 // Ensure the upload directory exists
 fs.mkdirSync(uploadDir, { recursive: true });
