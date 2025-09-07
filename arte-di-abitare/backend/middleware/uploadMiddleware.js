@@ -2,43 +2,38 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// FIX: Use an absolute path to ensure files are always saved in the correct location,
-// regardless of the current working directory.
+// FINAL FIX: Use an absolute path derived from __dirname to ensure the save location is always correct.
 const uploadDir = path.join(__dirname, '..', 'public', 'uploads');
 
-// Ensure the upload directory exists
+// Ensure the upload directory exists synchronously on startup
 fs.mkdirSync(uploadDir, { recursive: true });
 
-// Set storage engine
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, uploadDir);
   },
   filename: function(req, file, cb){
-    // Create a unique filename to avoid conflicts
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname).toLowerCase());
   }
 });
 
-// A more robust file type check focusing only on the mimetype
 function checkFileType(file, cb){
-  // Regular expression to match allowed image mimetypes, now including heic
-  const filetypes = /jpeg|jpg|png|gif|webp|heic/;
+  // Allow common image types, including heic/heif
+  const filetypes = /jpeg|jpg|png|gif|webp|heic|heif/;
   const isMimeTypeAllowed = filetypes.test(file.mimetype);
 
   if (isMimeTypeAllowed) {
     return cb(null, true);
   } else {
     console.error(`[Upload Middleware] File rejected. Mimetype: ${file.mimetype}, Original Name: ${file.originalname}`);
-    cb(new Error('Errore: Solo file di tipo immagine sono ammessi (jpeg, png, gif, webp, heic).'), false);
+    cb(new Error('Errore: Tipi di file ammessi: jpeg, png, gif, webp, heic.'), false);
   }
 }
 
-// Initialize upload middleware
 const upload = multer({
   storage: storage,
-  limits: { fileSize: 15 * 1024 * 1024 }, // Limit file size to 15MB
+  limits: { fileSize: 20 * 1024 * 1024 }, // Increased to 20MB
   fileFilter: function(req, file, cb){
     checkFileType(file, cb);
   }

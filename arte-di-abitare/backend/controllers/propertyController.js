@@ -6,23 +6,17 @@ const fs = require('fs').promises;
 const path = require('path');
 const heicConvert = require('heic-convert');
 
-// --- Helper Functions ---
-
 const UPLOADS_DIR = path.join(__dirname, '..', 'public', 'uploads');
 
-// Helper to safely remove a file from the uploads directory
 const removeFile = async (filename) => {
     if (!filename) return;
     try {
         await fs.unlink(path.join(UPLOADS_DIR, filename));
     } catch (err) {
-        if (err.code !== 'ENOENT') {
-            console.error(`Failed to delete old file: ${filename}`, err);
-        }
+        if (err.code !== 'ENOENT') console.error(`Failed to delete old file: ${filename}`, err);
     }
 };
 
-// Helper to handle HEIC to JPEG conversion
 const handleImageConversion = async (file) => {
     if (!file) return null;
     if (file.mimetype === 'image/heic' || file.mimetype === 'image/heif') {
@@ -43,7 +37,6 @@ const handleImageConversion = async (file) => {
     return file.filename;
 };
 
-// @desc    Search for a property by RIF (for public users) and create a lead
 const searchProperty = async (req, res) => {
     const { rif } = req.body;
     if (!rif) { return res.status(400).json({ message: 'Per favore, fornisci un codice RIF.' }); }
@@ -68,7 +61,7 @@ const searchProperty = async (req, res) => {
             _id: property._id,
             rif: property.rif,
             title: property.title,
-            dossierImage: property.dossierImage, // Send back only the filename
+            dossierImage: property.dossierImage,
             questionnairesCompleted: !!anyLeadWithQuestionnaires,
         });
     } catch (error) {
@@ -76,7 +69,6 @@ const searchProperty = async (req, res) => {
     }
 };
 
-// @desc    Get a watermarked floor plan for a property
 const getWatermarkedFloorPlan = async (req, res) => {
     try {
         const normalizedRif = req.params.rif.replace(/\s/g, '').toUpperCase();
@@ -84,16 +76,13 @@ const getWatermarkedFloorPlan = async (req, res) => {
         if (!property || !property.planimetryImage) {
             return res.status(404).json({ message: 'Planimetria non trovata.' });
         }
-
-        // FIX: Construct the correct, absolute filesystem path
         const imagePath = path.join(UPLOADS_DIR, property.planimetryImage);
-
         const imageBuffer = await fs.readFile(imagePath);
         const userEmail = req.user.email;
         const currentDate = new Date().toLocaleString('it-IT', { timeZone: 'Europe/Rome' });
         const watermarkText = `${userEmail}   ${currentDate}`;
-        // Increased font size and adjusted other SVG attributes for better visibility
-        const svgWatermark = `<svg width="700" height="140"><text x="20" y="80" font-family="Arial, sans-serif" font-weight="bold" font-size="32" fill="rgba(0, 0, 0, 0.2)" transform="rotate(-25)">${watermarkText}</text></svg>`;
+        // FINAL FIX: Significantly increased font size and adjusted SVG to ensure visibility
+        const svgWatermark = `<svg width="950" height="150"><text x="30" y="90" font-family="Arial, sans-serif" font-weight="bold" font-size="48" fill="rgba(0, 0, 0, 0.25)" transform="rotate(-30)">${watermarkText}</text></svg>`;
         const svgBuffer = Buffer.from(svgWatermark);
         const watermarkedImageBuffer = await sharp(imageBuffer)
             .composite([{ input: svgBuffer, tile: true, blend: 'over' }])
@@ -106,18 +95,14 @@ const getWatermarkedFloorPlan = async (req, res) => {
     }
 };
 
-// --- Employee-only routes ---
-
 const createProperty = async (req, res) => {
     try {
         if (!req.files || !req.files.dossierImage || !req.files.planimetryImage || !req.files.zoneImage) {
             return res.status(400).json({ message: 'Tutte e tre le immagini sono obbligatorie.' });
         }
-
         const dossierImageFilename = await handleImageConversion(req.files.dossierImage[0]);
         const planimetryImageFilename = await handleImageConversion(req.files.planimetryImage[0]);
         const zoneImageFilename = await handleImageConversion(req.files.zoneImage[0]);
-
         const propertyData = {
             ...req.body,
             dossierImage: dossierImageFilename,
@@ -125,13 +110,10 @@ const createProperty = async (req, res) => {
             zoneImage: zoneImageFilename,
             isActive: req.body.isActive === 'true',
         };
-
         const property = new Property(propertyData);
         const createdProperty = await property.save();
-        logActivity(req.employee._id, 'CREATE_PROPERTY', `Creato immobile RIF: ${createdProperty.rif}`);
         res.status(201).json(createdProperty);
     } catch (error) {
-        console.error(error);
         res.status(400).json({ message: 'Dati immobile non validi.', error: error.message });
     }
 };
@@ -139,20 +121,9 @@ const createProperty = async (req, res) => {
 const updateProperty = async (req, res) => {
     try {
         const property = await Property.findById(req.params.id);
-        if (!property) {
-            return res.status(404).json({ message: 'Immobile non trovato.' });
-        }
-
-        const { rif, title, zone, price, surface, bedrooms, bathrooms, isActive } = req.body;
-        property.rif = rif || property.rif;
-        property.title = title || property.title;
-        property.zone = zone || property.zone;
-        property.price = price || property.price;
-        property.surface = surface || property.surface;
-        property.bedrooms = bedrooms || property.bedrooms;
-        property.bathrooms = bathrooms || property.bathrooms;
-        property.isActive = isActive === 'true';
-
+        if (!property) return res.status(404).json({ message: 'Immobile non trovato.' });
+        Object.assign(property, req.body);
+        property.isActive = req.body.isActive === 'true';
         if (req.files) {
             if (req.files.dossierImage) {
                 await removeFile(property.dossierImage);
@@ -167,42 +138,22 @@ const updateProperty = async (req, res) => {
                 property.zoneImage = await handleImageConversion(req.files.zoneImage[0]);
             }
         }
-
         const updatedProperty = await property.save();
-        logActivity(req.employee._id, 'UPDATE_PROPERTY', `Aggiornato immobile RIF: ${updatedProperty.rif}`);
         res.json(updatedProperty);
     } catch (error) {
-        console.error(error);
         res.status(400).json({ message: 'Dati immobile non validi.', error: error.message });
     }
-};
-
-const getProperties = async (req, res) => {
-    try {
-        const properties = await Property.find({}).sort({ createdAt: -1 });
-        res.json(properties);
-    } catch (error) { res.status(500).json({ message: 'Errore del server.' }); }
-};
-
-const getPropertyById = async (req, res) => {
-    try {
-        const property = await Property.findById(req.params.id);
-        if (property) { res.json(property); }
-        else { res.status(404).json({ message: 'Immobile non trovato.' }); }
-    } catch (error) { res.status(500).json({ message: 'Errore del server.' }); }
 };
 
 const deleteProperty = async (req, res) => {
     try {
         const property = await Property.findById(req.params.id);
         if (property) {
-            const rif = property.rif;
             await removeFile(property.dossierImage);
             await removeFile(property.planimetryImage);
             await removeFile(property.zoneImage);
             await property.deleteOne();
-            logActivity(req.employee._id, 'DELETE_PROPERTY', `Rimosso immobile RIF: ${rif}`);
-            res.json({ message: 'Immobile rimosso con successo.' });
+            res.json({ message: 'Immobile rimosso.' });
         } else {
             res.status(404).json({ message: 'Immobile non trovato.' });
         }
@@ -211,43 +162,43 @@ const deleteProperty = async (req, res) => {
     }
 };
 
+// ... (rest of the functions like getProperties, getPropertyById, getPropertyZone, getAlternatives)
+const getProperties = async (req, res) => {
+    try {
+        const properties = await Property.find({}).sort({ createdAt: -1 });
+        res.json(properties);
+    } catch (error) { res.status(500).json({ message: 'Errore del server.' }); }
+};
+const getPropertyById = async (req, res) => {
+    try {
+        const property = await Property.findById(req.params.id);
+        if (property) { res.json(property); }
+        else { res.status(404).json({ message: 'Immobile non trovato.' }); }
+    } catch (error) { res.status(500).json({ message: 'Errore del server.' }); }
+};
 const getPropertyZone = async (req, res) => {
     try {
         const property = await Property.findOne({ rif: req.params.rif.toUpperCase() }, 'title zoneImage');
         if (property && property.zoneImage) {
-            res.json({
-                zoneImage: property.zoneImage,
-                title: property.title,
-            });
+            res.json({ zoneImage: property.zoneImage, title: property.title });
         } else {
-            res.status(404).json({ message: 'Dati della zona non trovati per questo immobile.' });
+            res.status(404).json({ message: 'Dati della zona non trovati.' });
         }
     } catch (error) {
-        console.error('Error fetching property zone:', error);
         res.status(500).json({ message: 'Errore del server.' });
     }
 };
-
-const parseBudget = (budgetStr) => {
-    if (!budgetStr) return null;
-    return parseInt(budgetStr.replace(/[€\.\s]/g, ''), 10);
-};
-
 const getAlternatives = async (req, res) => {
     try {
         const { rif } = req.params;
         const userId = req.user._id;
         const originalProperty = await Property.findOne({ rif: rif.toUpperCase() });
-        if (!originalProperty) {
-            return res.status(404).json({ message: 'Immobile originale non trovato.' });
-        }
+        if (!originalProperty) return res.status(404).json({ message: 'Immobile originale non trovato.' });
         const lead = await Lead.findOne({ user: userId, property: originalProperty._id });
-        if (!lead || !lead.questionnaire1 || !lead.questionnaire2) {
-            return res.json([]);
-        }
+        if (!lead || !lead.questionnaire1 || !lead.questionnaire2) return res.json([]);
         const { maxBudget } = lead.questionnaire1;
         const { searchZone, minBedrooms } = lead.questionnaire2;
-        const budget = parseBudget(maxBudget);
+        const budget = parseInt(String(maxBudget).replace(/[€\.\s]/g, ''), 10) || null;
         const priceMargin = 0.20;
         const query = { _id: { $ne: originalProperty._id }, isActive: true };
         if (searchZone) { query.zone = { $regex: searchZone, $options: 'i' }; }
@@ -256,8 +207,7 @@ const getAlternatives = async (req, res) => {
         const alternatives = await Property.find(query).limit(3).select('_id title rif').sort({ createdAt: -1 });
         res.json(alternatives);
     } catch (error) {
-        console.error('Error fetching alternatives:', error);
-        res.status(500).json({ message: 'Errore del server durante la ricerca di alternative.' });
+        res.status(500).json({ message: 'Errore del server.' });
     }
 };
 

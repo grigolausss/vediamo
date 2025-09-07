@@ -29,6 +29,8 @@ interface LeadDetails {
   createdAt: string;
   questionnaire1?: Questionnaire1;
   questionnaire2?: Questionnaire2;
+  decisionPropertyInterest?: string; // new
+  decisionZoneInterest?: string;     // new
   isContacted: boolean;
   calledBy?: { email: string; };
   callDate?: string;
@@ -69,7 +71,6 @@ export default function LeadDetailPage() {
     const [currentUserEmail, setCurrentUserEmail] = useState('');
 
     useEffect(() => {
-        // In a real app, you'd get this from a global state/context
         const storedEmail = localStorage.getItem('employeeEmail');
         if(storedEmail) setCurrentUserEmail(storedEmail);
 
@@ -83,12 +84,11 @@ export default function LeadDetailPage() {
                 if (!res.ok) throw new Error('Lead non trovato.');
                 const data: LeadDetails = await res.json();
                 setLead(data);
-                // Initialize form state from fetched lead data
                 setCallManager({
                     isContacted: data.isContacted || false,
                     calledByEmail: data.calledBy?.email || (data.isContacted ? '' : storedEmail || ''),
                     callDate: data.callDate ? new Date(data.callDate).toISOString().slice(0, 16) : '',
-                    noteText: '', // Keep note text fresh
+                    noteText: '',
                     needsCallback: data.needsCallback || false,
                     callbackDate: data.callbackDate ? new Date(data.callbackDate).toISOString().slice(0, 16) : '',
                 });
@@ -100,17 +100,8 @@ export default function LeadDetailPage() {
 
     const handleCallManagerChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value, type } = e.target;
-        const isCheckbox = type === 'checkbox';
         const { checked } = e.target as HTMLInputElement;
-
-        setCallManager(prev => {
-            const newState = { ...prev, [name]: isCheckbox ? checked : value };
-            // If "isContacted" is checked, pre-fill "calledByEmail" if it's empty
-            if (name === 'isContacted' && checked && !newState.calledByEmail) {
-                newState.calledByEmail = currentUserEmail;
-            }
-            return newState;
-        });
+        setCallManager(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
     };
 
     const handleUpdateCallDetails = async (e: React.FormEvent) => {
@@ -120,19 +111,14 @@ export default function LeadDetailPage() {
         try {
             const token = localStorage.getItem('employeeAuthToken');
             if (!token) { router.push('/admin/login'); return; }
-            // This will be a new endpoint to handle this specific form
             const res = await fetch(`/api/leads/${id}/call-details`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify(callManager),
             });
-            if (!res.ok) {
-                const errorData = await res.json();
-                throw new Error(errorData.message || 'Errore durante l\'aggiornamento.');
-            }
+            if (!res.ok) throw new Error((await res.json()).message || 'Errore.');
             const updatedLead = await res.json();
-            setLead(updatedLead); // Refresh lead data
-            // Reset note text after successful submission
+            setLead(updatedLead);
             setCallManager(prev => ({...prev, noteText: ''}));
         } catch (err: any) { setError(err.message); }
         finally { setIsUpdating(false); }
@@ -149,7 +135,6 @@ export default function LeadDetailPage() {
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-            {/* Left Side (75%) */}
             <div className="lg:col-span-3 bg-white p-6 rounded-lg shadow-lg">
                 <h1 className="text-3xl font-bold mb-4">{lead.user.name} {lead.user.surname}</h1>
                 <div className="space-y-1 text-gray-700 mb-6">
@@ -158,6 +143,14 @@ export default function LeadDetailPage() {
                     <p><strong>Immobile di interesse:</strong> {lead.property.title} (<Link href={`/admin/immobili/edit/${lead.property._id}`} className="text-blue-600 hover:underline">{lead.property.rif}</Link>)</p>
                     <p><strong>Stato attuale:</strong> <span className="font-semibold px-2 py-1 bg-blue-200 text-blue-800 rounded-full text-sm">{lead.status}</span></p>
                     <p><strong>Data Creazione Lead:</strong> {new Date(lead.createdAt).toLocaleString('it-IT')}</p>
+                </div>
+
+                <div className="mt-6 border-t pt-4">
+                    <h2 className="text-2xl font-bold mb-2">Decisioni Cliente</h2>
+                    <ul className="divide-y divide-gray-200">
+                        {renderQuestion('Interesse per l\'immobile', lead.decisionPropertyInterest)}
+                        {renderQuestion('Feedback sulla zona', lead.decisionZoneInterest)}
+                    </ul>
                 </div>
 
                 {lead.questionnaire1 && (
@@ -186,13 +179,10 @@ export default function LeadDetailPage() {
                 )}
             </div>
 
-            {/* Right Side (25%) */}
             <div className="lg:col-span-1 bg-white p-6 rounded-lg shadow-lg">
                 <form onSubmit={handleUpdateCallDetails} className="space-y-4">
                     <h2 className="text-2xl font-bold">Gestore Chiamate</h2>
-
                     <div className="flex items-center gap-2"><input type="checkbox" id="isContacted" name="isContacted" checked={callManager.isContacted} onChange={handleCallManagerChange} className="h-5 w-5" /><label htmlFor="isContacted">Lead già contattato</label></div>
-
                     {callManager.isContacted && (
                         <div className="pl-4 border-l-2 space-y-4">
                             <div><label htmlFor="calledByEmail" className="block font-semibold text-sm">Chiamato da</label><input type="email" id="calledByEmail" name="calledByEmail" value={callManager.calledByEmail} onChange={handleCallManagerChange} className="w-full p-2 border rounded-md mt-1" /></div>
@@ -200,15 +190,12 @@ export default function LeadDetailPage() {
                             <div><label htmlFor="noteText" className="block font-semibold text-sm">Note</label><textarea id="noteText" name="noteText" value={callManager.noteText} onChange={handleCallManagerChange} className="w-full p-2 border rounded-md mt-1" rows={4} placeholder="Inserisci qui le note della chiamata..."></textarea></div>
                         </div>
                     )}
-
                     <div className="flex items-center gap-2 pt-2"><input type="checkbox" id="needsCallback" name="needsCallback" checked={callManager.needsCallback} onChange={handleCallManagerChange} className="h-5 w-5" /><label htmlFor="needsCallback">Da richiamare</label></div>
-
                     {callManager.needsCallback && (
                         <div className="pl-4 border-l-2">
                              <div><label htmlFor="callbackDate" className="block font-semibold text-sm">Promemoria richiamo</label><input type="datetime-local" id="callbackDate" name="callbackDate" value={callManager.callbackDate} onChange={handleCallManagerChange} required className="w-full p-2 border rounded-md mt-1" /></div>
                         </div>
                     )}
-
                     <button type="submit" disabled={isUpdating} className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400">{isUpdating ? 'Salvataggio...' : 'Salva'}</button>
                     {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
                 </form>

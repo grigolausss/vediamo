@@ -4,7 +4,8 @@ const User = require('../models/userModel');
 const Employee = require('../models/employeeModel');
 const logActivity = require('../utils/logger');
 
-// @desc    Submit the first questionnaire
+// ... (existing functions like submitQuestionnaire1, submitQuestionnaire2)
+
 const submitQuestionnaire1 = async (req, res) => {
     const { propertyRif, answers } = req.body;
     const userId = req.user._id;
@@ -22,7 +23,6 @@ const submitQuestionnaire1 = async (req, res) => {
     }
 };
 
-// @desc    Submit the second questionnaire
 const submitQuestionnaire2 = async (req, res) => {
     const { propertyRif, answers } = req.body;
     const userId = req.user._id;
@@ -39,7 +39,46 @@ const submitQuestionnaire2 = async (req, res) => {
     }
 };
 
-// === Employee Dashboard Lead Fetching Routes ===
+// --- New User Decision Tracking Functions ---
+
+const savePropertyDecision = async (req, res) => {
+    const { choice } = req.body; // 'interessato' or 'non interessato'
+    const { rif } = req.params;
+    const userId = req.user._id;
+    try {
+        const property = await Property.findOne({ rif: rif.toUpperCase() });
+        if (!property) return res.status(404).json({ message: 'Immobile non trovato.' });
+        const lead = await Lead.findOne({ user: userId, property: property._id });
+        if (!lead) return res.status(404).json({ message: 'Lead non trovato.' });
+
+        lead.decisionPropertyInterest = choice;
+        await lead.save();
+        res.status(200).json({ message: 'Decisione salvata.' });
+    } catch (error) {
+        res.status(500).json({ message: 'Errore del server.' });
+    }
+};
+
+const saveZoneDecision = async (req, res) => {
+    const { choice } = req.body; // 'zona va bene' or 'zona non va bene'
+    const { rif } = req.params;
+    const userId = req.user._id;
+    try {
+        const property = await Property.findOne({ rif: rif.toUpperCase() });
+        if (!property) return res.status(404).json({ message: 'Immobile non trovato.' });
+        const lead = await Lead.findOne({ user: userId, property: property._id });
+        if (!lead) return res.status(404).json({ message: 'Lead non trovato.' });
+
+        lead.decisionZoneInterest = choice;
+        await lead.save();
+        res.status(200).json({ message: 'Decisione sulla zona salvata.' });
+    } catch (error) {
+        res.status(500).json({ message: 'Errore del server.' });
+    }
+};
+
+
+// ... (rest of the existing controller functions: getHotLeads, getWarmLeads, etc.)
 
 const getHotLeads = async (req, res) => {
     try {
@@ -67,16 +106,14 @@ const getWarmLeads = async (req, res) => {
 
 const getIncompleteLeads = async (req, res) => {
     try {
-        // A lead is incomplete if it has been created but not marked as 'Da richiamare' or 'Cliente'
         const leads = await Lead.find({
-            status: { $nin: ['Da richiamare', 'Cliente'] }
+            status: { $nin: ['Da richiamare', 'Cliente', 'Archiviato'] }
         }).populate('user', 'name surname email phone').populate('property', 'title rif').sort({ createdAt: -1 });
         res.status(200).json(leads);
     } catch (error) {
         res.status(500).json({ message: 'Errore del server.' });
     }
 };
-
 
 const getTodaysReminders = async (req, res) => {
     try {
@@ -128,9 +165,14 @@ const updateLeadCallDetails = async (req, res) => {
         } else if (!isContacted) {
             lead.calledBy = null;
         }
-        if (needsCallback) { lead.status = 'Da richiamare'; }
-        else if (isContacted) { lead.status = 'Contattato'; }
-        if (lead.status === 'Nuovo' && isContacted) { lead.status = 'Contattato'; }
+        // Update status based on the new logic
+        if (isContacted && !needsCallback) {
+            lead.status = 'Archiviato';
+        } else if (needsCallback) {
+            lead.status = 'Da richiamare';
+        } else if (isContacted) {
+            lead.status = 'Contattato';
+        }
         const updatedLead = await lead.save();
         await updatedLead.populate([
             { path: 'user', select: 'name surname email phone' },
@@ -145,12 +187,28 @@ const updateLeadCallDetails = async (req, res) => {
     }
 };
 
+
+const getArchivedLeads = async (req, res) => {
+    try {
+        const leads = await Lead.find({ status: 'Archiviato' })
+            .populate('user', 'name surname email phone')
+            .populate('property', 'title rif')
+            .sort({ updatedAt: -1 }); // Sort by when they were last updated (archived)
+        res.status(200).json(leads);
+    } catch (error) {
+        res.status(500).json({ message: 'Errore del server.' });
+    }
+};
+
 module.exports = {
     submitQuestionnaire1,
     submitQuestionnaire2,
+    savePropertyDecision,
+    saveZoneDecision,
     getHotLeads,
     getWarmLeads,
     getIncompleteLeads,
+    getArchivedLeads,
     getTodaysReminders,
     getLeadById,
     updateLeadCallDetails,

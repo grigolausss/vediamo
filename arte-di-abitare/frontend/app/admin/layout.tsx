@@ -29,6 +29,7 @@ const Header = () => {
                     <Link href="/admin/immobili" className="text-gray-600 hover:text-blue-700">Immobili</Link>
                     <Link href="/admin/utenti" className="text-gray-600 hover:text-blue-700">Utenti</Link>
                     <Link href="/admin/logs" className="text-gray-600 hover:text-blue-700">Log Attività</Link>
+                    <Link href="/admin/archivio" className="text-gray-600 hover:text-blue-700">Archivio</Link>
                 </nav>
             </div>
             <div className="flex items-center gap-4">

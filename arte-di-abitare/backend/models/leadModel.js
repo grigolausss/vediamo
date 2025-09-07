@@ -30,9 +30,18 @@ const leadSchema = mongoose.Schema(
     },
     questionnaire1: questionnaire1Schema,
     questionnaire2: questionnaire2Schema,
+    // User choices from the decision funnels
+    decisionPropertyInterest: {
+      type: String,
+      enum: ['interessato', 'non interessato'],
+    },
+    decisionZoneInterest: {
+      type: String,
+      enum: ['zona va bene', 'zona non va bene'],
+    },
     status: {
         type: String,
-        enum: ['Nuovo', 'Contattato', 'Da richiamare', 'Non interessato', 'Cliente'],
+        enum: ['Nuovo', 'Contattato', 'Da richiamare', 'Non interessato', 'Cliente', 'Archiviato'],
         default: 'Nuovo'
     },
     // Call Management

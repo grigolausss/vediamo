@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 
-// Define the new structure for the property data, including the new fields
 export interface PropertyData {
   _id?: string;
   rif: string;
@@ -51,7 +50,7 @@ export default function PropertyForm({ initialData = {}, onSubmit, isSaving, err
   useEffect(() => {
     if (initialData && initialData._id) {
         setProperty({ ...initialData });
-        // FIX: Construct full URLs for existing images for the previews
+        // FINAL FIX: Construct full URLs for existing images for the previews
         setPreviews({
             dossierImage: typeof initialData.dossierImage === 'string' ? `${API_BASE_URL}/uploads/${initialData.dossierImage}` : '',
             planimetryImage: typeof initialData.planimetryImage === 'string' ? `${API_BASE_URL}/uploads/${initialData.planimetryImage}` : '',
@@ -70,7 +69,6 @@ export default function PropertyForm({ initialData = {}, onSubmit, isSaving, err
     if (files && files.length > 0) {
       const file = files[0];
       setProperty(prev => ({ ...prev, [name]: file }));
-      // Create a temporary local URL for the new image preview
       setPreviews(prev => ({...prev, [name]: URL.createObjectURL(file)}));
     }
   };
@@ -78,14 +76,12 @@ export default function PropertyForm({ initialData = {}, onSubmit, isSaving, err
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const formData = new FormData();
-
     Object.keys(property).forEach(key => {
       const value = property[key as keyof typeof property];
       if (value !== undefined && value !== null) {
           formData.append(key, value as string | Blob);
       }
     });
-
     onSubmit(formData);
   };
 
@@ -96,34 +92,26 @@ export default function PropertyForm({ initialData = {}, onSubmit, isSaving, err
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8 bg-white p-8 rounded-lg shadow-lg">
-      {/* Section 1: Basic Info */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-b pb-8">
-        <div><label className="block font-medium">RIF (univoco)</label><input name="rif" value={property.rif} onChange={handleChange} required className="w-full p-2 border rounded-md mt-1" /></div>
-        <div><label className="block font-medium">Titolo</label><input name="title" value={property.title} onChange={handleChange} required className="w-full p-2 border rounded-md mt-1" /></div>
+        <div><label className="block font-medium">RIF (univoco)</label><input name="rif" value={property.rif || ''} onChange={handleChange} required className="w-full p-2 border rounded-md mt-1" /></div>
+        <div><label className="block font-medium">Titolo</label><input name="title" value={property.title || ''} onChange={handleChange} required className="w-full p-2 border rounded-md mt-1" /></div>
       </div>
-
-      {/* Section 2: Property Details */}
        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 border-b pb-8">
-          <div><label className="block font-medium">Zona</label><input name="zone" value={property.zone} onChange={handleChange} required className="w-full p-2 border rounded-md mt-1" /></div>
-          <div><label className="block font-medium">Prezzo (€)</label><input name="price" type="number" value={property.price} onChange={handleChange} required className="w-full p-2 border rounded-md mt-1" /></div>
-          <div><label className="block font-medium">Superficie (mq)</label><input name="surface" type="number" value={property.surface} onChange={handleChange} required className="w-full p-2 border rounded-md mt-1" /></div>
-          <div><label className="block font-medium">N. Camere</label><input name="bedrooms" type="number" value={property.bedrooms} onChange={handleChange} required className="w-full p-2 border rounded-md mt-1" /></div>
-          <div><label className="block font-medium">N. Bagni</label><input name="bathrooms" type="number" value={property.bathrooms} onChange={handleChange} required className="w-full p-2 border rounded-md mt-1" /></div>
+          <div><label className="block font-medium">Zona</label><input name="zone" value={property.zone || ''} onChange={handleChange} required className="w-full p-2 border rounded-md mt-1" /></div>
+          <div><label className="block font-medium">Prezzo (€)</label><input name="price" type="number" value={property.price || 0} onChange={handleChange} required className="w-full p-2 border rounded-md mt-1" /></div>
+          <div><label className="block font-medium">Superficie (mq)</label><input name="surface" type="number" value={property.surface || 0} onChange={handleChange} required className="w-full p-2 border rounded-md mt-1" /></div>
+          <div><label className="block font-medium">N. Camere</label><input name="bedrooms" type="number" value={property.bedrooms || 0} onChange={handleChange} required className="w-full p-2 border rounded-md mt-1" /></div>
+          <div><label className="block font-medium">N. Bagni</label><input name="bathrooms" type="number" value={property.bathrooms || 0} onChange={handleChange} required className="w-full p-2 border rounded-md mt-1" /></div>
       </div>
-
-      {/* Section 3: File Uploads */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-b pb-8">
-          <div><label className="block font-medium">1. Foto Dossier (A4)</label><input name="dossierImage" type="file" onChange={handleFileChange} className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-violet-50 file:text-violet-700 hover:file:bg-violet-100 mt-1"/>{renderPreview(previews.dossierImage)}</div>
-          <div><label className="block font-medium">2. Foto Planimetria</label><input name="planimetryImage" type="file" onChange={handleFileChange} className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-violet-50 file:text-violet-700 hover:file:bg-violet-100 mt-1"/>{renderPreview(previews.planimetryImage)}</div>
-          <div><label className="block font-medium">3. Foto Zona</label><input name="zoneImage" type="file" onChange={handleFileChange} className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-violet-50 file:text-violet-700 hover:file:bg-violet-100 mt-1"/>{renderPreview(previews.zoneImage)}</div>
+          <div><label className="block font-medium">1. Foto Dossier (A4)</label><input name="dossierImage" type="file" onChange={handleFileChange} className="w-full text-sm"/>{renderPreview(previews.dossierImage)}</div>
+          <div><label className="block font-medium">2. Foto Planimetria</label><input name="planimetryImage" type="file" onChange={handleFileChange} className="w-full text-sm"/>{renderPreview(previews.planimetryImage)}</div>
+          <div><label className="block font-medium">3. Foto Zona</label><input name="zoneImage" type="file" onChange={handleFileChange} className="w-full text-sm"/>{renderPreview(previews.zoneImage)}</div>
       </div>
-
       <div className="flex items-center gap-2 pt-4"><input name="isActive" type="checkbox" checked={property.isActive} onChange={handleChange} className="h-5 w-5" /><label>Immobile Attivo</label></div>
-
       {error && <p className="text-red-600 text-center font-semibold">{error}</p>}
-
-      <button type="submit" disabled={isSaving} className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg disabled:bg-gray-400 transition-colors">
-        {isSaving ? 'Salvataggio in corso...' : 'Salva Immobile'}
+      <button type="submit" disabled={isSaving} className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg disabled:bg-gray-400">
+        {isSaving ? 'Salvataggio...' : 'Salva Immobile'}
       </button>
     </form>
   );
