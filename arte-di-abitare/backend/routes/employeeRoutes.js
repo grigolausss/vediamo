@@ -12,28 +12,30 @@ const {
     deleteEmployee,
     updateMyPassword
 } = require('../controllers/employeeController');
-// Removing 'admin' middleware as the role concept is being removed
 const { protectEmployee } = require('../middleware/employeeAuthMiddleware');
+const {
+    validateLogin,
+    validateForgotPassword,
+    validateResetPassword
+} = require('../middleware/validationMiddleware');
 
 // Public routes
-router.post('/login', loginEmployee);
-router.post('/login/verify-otp', verifyEmployeeOtp);
-router.post('/forgot-password', forgotPassword);
-router.put('/reset-password/:resettoken', resetPassword);
+router.post('/login', validateLogin, loginEmployee);
+router.post('/login/verify-otp', verifyEmployeeOtp); // OTP format could be validated here
+router.post('/forgot-password', validateForgotPassword, forgotPassword);
+router.put('/reset-password/:resettoken', validateResetPassword, resetPassword);
 
 // --- Protected Employee Routes ---
-
-// All employees can now perform these actions
 router.route('/')
-    .post(protectEmployee, createEmployee)
+    .post(protectEmployee, createEmployee) // Could add validation for createEmployee
     .get(protectEmployee, getEmployees);
 
 router.route('/profile/password')
-    .put(protectEmployee, updateMyPassword);
+    .put(protectEmployee, validateResetPassword, updateMyPassword); // Reuse reset password validation
 
 router.route('/:id')
     .get(protectEmployee, getEmployeeById)
-    .put(protectEmployee, updateEmployee)
+    .put(protectEmployee, updateEmployee) // Could add validation for updateEmployee
     .delete(protectEmployee, deleteEmployee);
 
 

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 
+// The data interface remains the same
 export interface PropertyData {
   _id?: string;
   rif: string;
@@ -17,6 +18,7 @@ export interface PropertyData {
   isActive: boolean;
 }
 
+// The props interface is simplified. The form will now manage its own state.
 interface PropertyFormProps {
   initialData?: Partial<PropertyData>;
   onSubmit: (data: FormData) => void;
@@ -26,8 +28,9 @@ interface PropertyFormProps {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-export default function PropertyForm({ initialData = {}, onSubmit, isSaving, error }: PropertyFormProps) {
-  const [property, setProperty] = useState<Partial<PropertyData>>({
+export default function PropertyForm({ initialData, onSubmit, isSaving, error }: PropertyFormProps) {
+  // The form now manages its own state.
+  const [property, setProperty] = useState<Partial<PropertyData>>(initialData || {
     rif: '',
     title: '',
     zone: '',
@@ -35,9 +38,6 @@ export default function PropertyForm({ initialData = {}, onSubmit, isSaving, err
     surface: 0,
     bedrooms: 0,
     bathrooms: 0,
-    dossierImage: '',
-    planimetryImage: '',
-    zoneImage: '',
     isActive: true,
   });
 
@@ -47,17 +47,17 @@ export default function PropertyForm({ initialData = {}, onSubmit, isSaving, err
       zoneImage: '',
   });
 
+  // Effect to set initial data and previews when editing
   useEffect(() => {
-    if (initialData && initialData._id) {
-        setProperty({ ...initialData });
-        // FINAL FIX: Construct full URLs for existing images for the previews
+    if (initialData) {
+        setProperty(initialData);
         setPreviews({
             dossierImage: typeof initialData.dossierImage === 'string' ? `${API_BASE_URL}/uploads/${initialData.dossierImage}` : '',
             planimetryImage: typeof initialData.planimetryImage === 'string' ? `${API_BASE_URL}/uploads/${initialData.planimetryImage}` : '',
             zoneImage: typeof initialData.zoneImage === 'string' ? `${API_BASE_URL}/uploads/${initialData.zoneImage}` : '',
         });
     }
-  }, [initialData?._id]);
+  }, [initialData]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -79,9 +79,20 @@ export default function PropertyForm({ initialData = {}, onSubmit, isSaving, err
     Object.keys(property).forEach(key => {
       const value = property[key as keyof typeof property];
       if (value !== undefined && value !== null) {
-          formData.append(key, value as string | Blob);
+          // For file objects, the file itself is the value.
+          // For string paths (on edit), we don't re-upload unless a new file is chosen.
+          // The backend should handle the logic of not updating the image if the field is not present.
+          if (value instanceof File) {
+            formData.append(key, value);
+          } else if (typeof value !== 'object') { // Append other form data
+            formData.append(key, String(value));
+          }
       }
     });
+     // Make sure to append the ID if it exists, so the backend knows which record to update
+    if (property._id) {
+        formData.append('_id', property._id);
+    }
     onSubmit(formData);
   };
 

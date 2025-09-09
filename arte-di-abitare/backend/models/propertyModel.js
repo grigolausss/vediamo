@@ -18,10 +18,12 @@ const propertySchema = mongoose.Schema(
     zone: {
       type: String,
       required: true,
+      index: true,
     },
     price: {
       type: Number,
       required: true,
+      index: true,
     },
     surface: { // mq
       type: Number,

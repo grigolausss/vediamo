@@ -2,6 +2,7 @@
 /node_modules
 /arte-di-abitare/backend/node_modules
 /arte-di-abitare/frontend/node_modules
+/jules-scratch/node_modules
 
 # Environment variables
 .env

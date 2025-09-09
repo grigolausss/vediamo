@@ -2,7 +2,8 @@ const Property = require('../models/propertyModel');
 const Lead = require('../models/leadModel');
 const logActivity = require('../utils/logger');
 const sharp = require('sharp');
-const fs = require('fs').promises;
+const fs = require('fs');
+const fsp = fs.promises;
 const path = require('path');
 const heicConvert = require('heic-convert');
 
@@ -11,30 +12,45 @@ const UPLOADS_DIR = path.join(__dirname, '..', 'public', 'uploads');
 const removeFile = async (filename) => {
     if (!filename) return;
     try {
-        await fs.unlink(path.join(UPLOADS_DIR, filename));
+        await fsp.unlink(path.join(UPLOADS_DIR, filename));
     } catch (err) {
         if (err.code !== 'ENOENT') console.error(`Failed to delete old file: ${filename}`, err);
     }
 };
 
-const handleImageConversion = async (file) => {
+const processImage = async (file) => {
     if (!file) return null;
+
+    const originalPath = file.path;
+    let inputBuffer;
+
+    // Convert HEIC/HEIF to a buffer that sharp can process
     if (file.mimetype === 'image/heic' || file.mimetype === 'image/heif') {
-        const originalPath = file.path;
-        const newFilename = `${path.parse(file.filename).name}.jpeg`;
-        const newPath = path.join(UPLOADS_DIR, newFilename);
-        try {
-            const inputBuffer = await fs.readFile(originalPath);
-            const outputBuffer = await heicConvert({ buffer: inputBuffer, format: 'JPEG', quality: 0.9 });
-            await fs.writeFile(newPath, outputBuffer);
-            await fs.unlink(originalPath);
-            return newFilename;
-        } catch (error) {
-            await fs.unlink(originalPath).catch(e => {});
-            throw new Error('Conversione del file HEIC fallita.');
-        }
+        inputBuffer = await heicConvert({
+            buffer: await fsp.readFile(originalPath),
+            format: 'JPEG',
+            quality: 1.0
+        });
+    } else {
+        inputBuffer = await fsp.readFile(originalPath);
     }
-    return file.filename;
+
+    // Create a new filename with a .jpeg extension for consistency
+    const newFilename = `${path.parse(file.filename).name}.jpeg`;
+    const newPath = path.join(UPLOADS_DIR, newFilename);
+
+    // Use sharp to resize and compress the image
+    await sharp(inputBuffer)
+        .resize({ width: 1920, withoutEnlargement: true }) // Max width 1920px
+        .jpeg({ quality: 85 }) // Compress to 85% quality
+        .toFile(newPath);
+
+    // Clean up the original temporary file uploaded by multer
+    if (fs.existsSync(originalPath)) {
+        await fsp.unlink(originalPath);
+    }
+
+    return newFilename;
 };
 
 const searchProperty = async (req, res) => {
@@ -77,7 +93,7 @@ const getWatermarkedFloorPlan = async (req, res) => {
             return res.status(404).json({ message: 'Planimetria non trovata.' });
         }
         const imagePath = path.join(UPLOADS_DIR, property.planimetryImage);
-        const imageBuffer = await fs.readFile(imagePath);
+        const imageBuffer = await fsp.readFile(imagePath);
         const userEmail = req.user.email;
         const currentDate = new Date().toLocaleString('it-IT', { timeZone: 'Europe/Rome' });
         const watermarkText = `${userEmail}   ${currentDate}`;
@@ -100,9 +116,9 @@ const createProperty = async (req, res) => {
         if (!req.files || !req.files.dossierImage || !req.files.planimetryImage || !req.files.zoneImage) {
             return res.status(400).json({ message: 'Tutte e tre le immagini sono obbligatorie.' });
         }
-        const dossierImageFilename = await handleImageConversion(req.files.dossierImage[0]);
-        const planimetryImageFilename = await handleImageConversion(req.files.planimetryImage[0]);
-        const zoneImageFilename = await handleImageConversion(req.files.zoneImage[0]);
+        const dossierImageFilename = await processImage(req.files.dossierImage[0]);
+        const planimetryImageFilename = await processImage(req.files.planimetryImage[0]);
+        const zoneImageFilename = await processImage(req.files.zoneImage[0]);
         const propertyData = {
             ...req.body,
             dossierImage: dossierImageFilename,
@@ -127,15 +143,15 @@ const updateProperty = async (req, res) => {
         if (req.files) {
             if (req.files.dossierImage) {
                 await removeFile(property.dossierImage);
-                property.dossierImage = await handleImageConversion(req.files.dossierImage[0]);
+                property.dossierImage = await processImage(req.files.dossierImage[0]);
             }
             if (req.files.planimetryImage) {
                 await removeFile(property.planimetryImage);
-                property.planimetryImage = await handleImageConversion(req.files.planimetryImage[0]);
+                property.planimetryImage = await processImage(req.files.planimetryImage[0]);
             }
             if (req.files.zoneImage) {
                 await removeFile(property.zoneImage);
-                property.zoneImage = await handleImageConversion(req.files.zoneImage[0]);
+                property.zoneImage = await processImage(req.files.zoneImage[0]);
             }
         }
         const updatedProperty = await property.save();

@@ -42,7 +42,8 @@ const leadSchema = mongoose.Schema(
     status: {
         type: String,
         enum: ['Nuovo', 'Contattato', 'Da richiamare', 'Non interessato', 'Cliente', 'Archiviato'],
-        default: 'Nuovo'
+        default: 'Nuovo',
+        index: true,
     },
     // Call Management
     isContacted: { type: Boolean, default: false },
