@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 // Lead interface for the dashboard cards
 interface Lead {
   _id: string;
@@ -48,10 +50,10 @@ export default function DashboardPage() {
 
         // Fetch all lead categories in parallel
         const [hotRes, warmRes, incompleteRes, remindersRes] = await Promise.all([
-            fetch('/api/leads/hot', { headers }),
-            fetch('/api/leads/warm', { headers }),
-            fetch('/api/leads/incomplete', { headers }),
-            fetch('/api/leads/reminders/today', { headers })
+            fetch(`${API_URL}/api/leads/hot`, { headers }),
+            fetch(`${API_URL}/api/leads/warm`, { headers }),
+            fetch(`${API_URL}/api/leads/incomplete`, { headers }),
+            fetch(`${API_URL}/api/leads/reminders/today`, { headers })
         ]);
 
         if (!hotRes.ok || !warmRes.ok || !incompleteRes.ok || !remindersRes.ok) {

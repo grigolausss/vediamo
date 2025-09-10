@@ -4,6 +4,8 @@ import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 interface ArchivedLead {
   _id: string;
   user: { name: string; surname: string; email: string; phone?: string; };
@@ -26,7 +28,7 @@ export default function ArchivePage() {
       try {
         const token = localStorage.getItem('employeeAuthToken');
         if (!token) { router.push('/admin/login'); return; }
-        const res = await fetch('/api/leads/archived', { headers: { 'Authorization': `Bearer ${token}` } });
+        const res = await fetch(`${API_URL}/api/leads/archived`, { headers: { 'Authorization': `Bearer ${token}` } });
         if (!res.ok) throw new Error('Errore nel caricamento dell\'archivio.');
         const data = await res.json();
         setArchivedLeads(data);
