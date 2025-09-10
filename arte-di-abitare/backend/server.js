@@ -6,6 +6,7 @@ const connectDB = require('./config/db');
 const path = require('path');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const cors = require('cors');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 
 // Connect to Database
@@ -17,6 +18,7 @@ app.set('trust proxy', 1);
 // --- Security Middleware ---
 app.use(helmet());
 app.use(express.json());
+app.use(cors());
 
 const limiter = rateLimit({
 	windowMs: 15 * 60 * 1000, // 15 minutes
