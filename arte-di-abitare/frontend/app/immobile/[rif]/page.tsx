@@ -21,7 +21,7 @@ export default function PropertyDossierPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
   useEffect(() => {
     if (!rif) return;
@@ -30,7 +30,7 @@ export default function PropertyDossierPage() {
       try {
         const token = localStorage.getItem('authToken');
         if (!token) { router.push('/'); return; }
-        const response = await fetch('/api/properties/search', {
+        const response = await fetch(`${API_URL}/api/properties/search`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           body: JSON.stringify({ rif }),
@@ -58,7 +58,7 @@ export default function PropertyDossierPage() {
         <p className="text-lg text-gray-500 mb-6">RIF: {property.rif}</p>
         <div className="mb-8 border rounded-lg">
             <img
-                src={`${API_BASE_URL}/uploads/${property.dossierImage}`}
+                src={`${API_URL}/uploads/${property.dossierImage}`}
                 alt={`Dossier per ${property.title}`}
                 className="rounded-lg w-full h-auto"
             />

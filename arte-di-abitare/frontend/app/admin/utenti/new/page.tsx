@@ -5,6 +5,8 @@ import EmployeeForm from '@/components/admin/EmployeeForm';
 import type { EmployeeData } from '@/components/admin/EmployeeForm';
 import Link from 'next/link';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 export default function NewUserPage() {
     const router = useRouter();
     const [isSaving, setIsSaving] = useState(false);
@@ -18,7 +20,7 @@ export default function NewUserPage() {
         try {
             const token = localStorage.getItem('employeeAuthToken');
             if (!token) { router.push('/admin/login'); return; }
-            const res = await fetch('/api/employees', {
+            const res = await fetch(`${API_URL}/api/employees`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify(data),

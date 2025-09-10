@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 interface Property {
   _id: string;
   rif: string;
@@ -25,7 +27,7 @@ export default function PropertyListPage() {
     try {
       const token = localStorage.getItem('employeeAuthToken');
       if (!token) { router.push('/admin/login'); return; }
-      const res = await fetch('/api/properties', { headers: { 'Authorization': `Bearer ${token}` } });
+      const res = await fetch(`${API_URL}/api/properties`, { headers: { 'Authorization': `Bearer ${token}` } });
       if (!res.ok) throw new Error('Errore nel caricamento degli immobili.');
       const data = await res.json();
       setProperties(data);
@@ -42,7 +44,7 @@ export default function PropertyListPage() {
       try {
         const token = localStorage.getItem('employeeAuthToken');
         if (!token) { router.push('/admin/login'); return; }
-        const res = await fetch(`/api/properties/${id}`, {
+        const res = await fetch(`${API_URL}/api/properties/${id}`, {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${token}` },
         });

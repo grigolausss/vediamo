@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 interface Employee {
   _id: string;
   email: string;
@@ -22,7 +24,7 @@ export default function UserListPage() {
     try {
       const token = localStorage.getItem('employeeAuthToken');
       if (!token) { router.push('/admin/login'); return; }
-      const res = await fetch('/api/employees', { headers: { 'Authorization': `Bearer ${token}` } });
+      const res = await fetch(`${API_URL}/api/employees`, { headers: { 'Authorization': `Bearer ${token}` } });
       if (!res.ok) throw new Error('Errore nel caricamento degli utenti.');
       const data = await res.json();
       setEmployees(data);
@@ -39,7 +41,7 @@ export default function UserListPage() {
       try {
         const token = localStorage.getItem('employeeAuthToken');
         if (!token) { router.push('/admin/login'); return; }
-        const res = await fetch(`/api/employees/${id}`, {
+        const res = await fetch(`${API_URL}/api/employees/${id}`, {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${token}` },
         });

@@ -2,7 +2,10 @@
 
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+
 import Link from 'next/link';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export default function ThankYouPage() {
     const router = useRouter();
@@ -23,7 +26,7 @@ export default function ThankYouPage() {
             if (!token) throw new Error('Autenticazione richiesta.');
 
             // New endpoint to save the user's phone number
-            const response = await fetch('/api/users/update-phone', {
+            const response = await fetch(`${API_URL}/api/users/update-phone`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ phone, rif }),

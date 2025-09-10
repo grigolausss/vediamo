@@ -3,7 +3,10 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import PropertyForm from '@/components/admin/PropertyForm';
 import type { PropertyData } from '@/components/admin/PropertyForm';
+
 import Link from 'next/link';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export default function NewPropertyPage() {
     const router = useRouter();
@@ -18,7 +21,7 @@ export default function NewPropertyPage() {
         try {
             const token = localStorage.getItem('employeeAuthToken');
             if (!token) { router.push('/admin/login'); return; }
-            const res = await fetch('/api/properties', {
+            const res = await fetch(`${API_URL}/api/properties`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` },
                 body: data,

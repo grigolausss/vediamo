@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 // State for the second questionnaire
 interface Answers {
   searchZone: string;
@@ -54,7 +56,7 @@ export default function Questionnaire2Page() {
             const token = localStorage.getItem('authToken');
             if (!token) throw new Error('Autenticazione richiesta.');
 
-            const response = await fetch('/api/leads/questionnaire2', {
+            const response = await fetch(`${API_URL}/api/leads/questionnaire2`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ propertyRif: rif, answers }),

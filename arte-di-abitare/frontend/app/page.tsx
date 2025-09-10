@@ -2,7 +2,10 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+
 import Link from 'next/link';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export default function Home() {
   const router = useRouter();
@@ -18,7 +21,7 @@ export default function Home() {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/users/request-otp', {
+      const res = await fetch(`${API_URL}/api/users/request-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, surname, email }),

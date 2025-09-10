@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 // New state structure for the questionnaire answers
 interface Answers {
   sellToBuy: 'sì' | 'no' | '';
@@ -62,7 +64,7 @@ export default function NewQuestionnairePage() {
             if (!token) throw new Error('Autenticazione richiesta.');
 
             // This will be a new endpoint
-            const response = await fetch('/api/leads/questionnaire1', {
+            const response = await fetch(`${API_URL}/api/leads/questionnaire1`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ propertyRif: rif, answers }),

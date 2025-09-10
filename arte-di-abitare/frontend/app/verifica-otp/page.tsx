@@ -2,6 +2,8 @@
 import { useState, useEffect, Suspense, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 function VerifyOtpComponent() {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -41,7 +43,7 @@ function VerifyOtpComponent() {
         // We need name and surname for the request-otp endpoint.
         // Since we don't have them here, we'll pass placeholder values.
         // The backend logic will find the existing user by email and ignore these.
-        const res = await fetch('/api/users/request-otp', {
+        const res = await fetch(`${API_URL}/api/users/request-otp`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: 'Utente', surname: 'Esistente', email }),
@@ -62,7 +64,7 @@ function VerifyOtpComponent() {
         setIsLoading(true);
         setError(null);
         try {
-            const res = await fetch('/api/users/verify-otp', {
+            const res = await fetch(`${API_URL}/api/users/verify-otp`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, otp }),
